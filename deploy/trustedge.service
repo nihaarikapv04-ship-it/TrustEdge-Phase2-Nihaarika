@@ -1,0 +1,25 @@
+[Unit]
+Description=TrustEdge local Pi gateway
+After=trustedge-network.service dnsmasq.service
+Requires=trustedge-network.service dnsmasq.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/trustedge
+EnvironmentFile=/etc/trustedge.env
+ExecStartPre=/opt/trustedge/.venv/bin/python -m trustedge.hardware check --config /etc/trustedge/gateway.json
+ExecStart=/opt/trustedge/.venv/bin/python -m trustedge --config /etc/trustedge/gateway.json
+Restart=on-failure
+RestartSec=5
+StateDirectory=trustedge
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/trustedge
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+
+[Install]
+WantedBy=multi-user.target

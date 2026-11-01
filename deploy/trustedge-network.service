@@ -1,0 +1,17 @@
+[Unit]
+Description=TrustEdge bootstrap firewall and IPv4 forwarding
+After=network-online.target nftables.service
+Wants=network-online.target
+Requires=nftables.service
+Before=trustedge.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/trustedge/bootstrap.nft
+ExecStart=/usr/sbin/nft -f /etc/trustedge/nat.nft
+ExecStart=/usr/sbin/sysctl -w net.ipv4.ip_forward=1
+ExecStop=/usr/sbin/sysctl -w net.ipv4.ip_forward=0
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+{
+  "lan": "eth1",
+  "wan": "eth0",
+  "lan_address": "192.168.50.1/24",
+  "dhcp_start": "192.168.50.100",
+  "dhcp_end": "192.168.50.200",
+  "dns_upstream": [],
+  "reservations": [],
+  "database": "/var/lib/trustedge/live.sqlite",
+  "api_port": 8080,
+  "masquerade": true
+}

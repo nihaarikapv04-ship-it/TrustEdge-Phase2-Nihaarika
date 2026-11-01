@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trustedge"
+version = "0.1.0"
+requires-python = ">=3.10,<3.14"
+dependencies = ["numpy>=1.24,<3", "scikit-learn==1.6.1", "joblib>=1.2,<2", "scapy>=2.5,<3"]
+
+[project.scripts]
+trustedge = "trustedge.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["trustedge*"]
+
+[tool.setuptools.package-data]
+trustedge = ["static/*.html", "static/*.css", "static/*.js"]

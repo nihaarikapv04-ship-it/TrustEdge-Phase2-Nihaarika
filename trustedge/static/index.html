@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>TrustEdge · Local gateway console</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+    <script defer src="/dashboard.js"></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="#overview"
+        ><span class="brand-mark">T<span>›</span></span
+        ><span>TrustEdge<small>LOCAL SECURITY CONSOLE</small></span></a
+      >
+      <div class="workspace">
+        <span class="workspace-icon">◈</span>
+        <div>
+          Edge workspace<small id="workspace-mode"
+            >Authentication required</small
+          >
+        </div>
+        <span class="tiny-dot"></span>
+      </div>
+      <div class="nav-label">MONITOR</div>
+      <nav aria-label="Main navigation">
+        <button class="nav-item active" data-view="overview">
+          <span>◫</span>Overview
+        </button>
+        <button class="nav-item" data-view="devices">
+          <span>▦</span>Devices <b id="nav-count">0</b>
+        </button>
+        <button class="nav-item" data-view="traffic">
+          <span>⇄</span>Traffic & detections
+        </button>
+        <button class="nav-item" data-view="trust">
+          <span>⌁</span>Trust intelligence
+        </button>
+        <button class="nav-item" data-view="topology">
+          <span>◇</span>Network topology
+        </button>
+        <div class="nav-label">OPERATE</div>
+        <button class="nav-item" data-view="audit">
+          <span>≡</span>Audit trail
+        </button>
+        <button class="nav-item" data-view="system">
+          <span>⚙</span>Gateway health
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="local-label">
+          <span class="tiny-dot"></span> Local by design
+        </div>
+        <p>
+          Detection, decisions, and data.<br />Everything stays on your gateway.
+        </p>
+        <button id="disconnect" class="sidebar-button">
+          Disconnect session ↗
+        </button>
+        <div class="version">PHASE 02 <span>PI GATEWAY</span></div>
+      </div>
+    </aside>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <span class="breadcrumb">Workspace</span><span class="slash">/</span
+          ><strong id="breadcrumb">Overview</strong>
+        </div>
+        <div class="topbar-right">
+          <span id="mode-badge" class="badge neutral">DISCONNECTED</span
+          ><span class="private-label">◈ No cloud connection</span
+          ><button
+            id="refresh"
+            class="icon-button"
+            aria-label="Refresh dashboard"
+          >
+            ↻</button
+          ><button id="pause" class="text-button">Pause updates</button>
+        </div>
+      </header>
+      <main id="main">
+        <section class="page-heading">
+          <div>
+            <div class="eyebrow">YOUR NETWORK, IN FOCUS</div>
+            <h1 id="page-title">Gateway overview</h1>
+            <p id="page-description">
+              A clear view of every device, decision, and boundary.
+            </p>
+          </div>
+          <div class="heading-actions">
+            <span id="last-updated">Not connected</span
+            ><button class="button primary" id="add-device">
+              ＋ Enroll device
+            </button>
+          </div>
+        </section>
+        <div id="global-alert" class="alert" role="status" hidden></div>
+        <section id="view-overview" class="view">
+          <div class="overview-banner">
+            <div>
+              <div class="eyebrow">LOCAL INTELLIGENCE. REAL CONTROL.</div>
+              <h2 id="banner-title">Your edge. Your rules.</h2>
+              <p id="banner-subtitle">
+                Connect to your gateway to see its current security posture.
+              </p>
+              <div class="banner-meta">
+                <span id="pipeline-state">○ Waiting for gateway</span
+                ><span>IF + Autoencoder</span><span>SQLite persistence</span>
+              </div>
+            </div>
+            <div class="banner-art" aria-hidden="true">
+              <span class="orbit orbit-one"></span
+              ><span class="orbit orbit-two"></span
+              ><span class="edge-core">T›</span
+              ><span class="node node-one">◈</span
+              ><span class="node node-two">▦</span
+              ><span class="node node-three">⌁</span>
+            </div>
+          </div>
+          <div id="metric-cards" class="metrics"></div>
+          <div class="grid-two">
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Traffic pulse</h2>
+                  <p>Packets observed in retained capture windows</p>
+                </div>
+                <span class="legend"><i class="swatch orange"></i>Packets</span>
+              </div>
+              <div id="traffic-chart" class="chart"></div>
+              <div id="traffic-caption" class="panel-foot"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Trust distribution</h2>
+                  <p>Confirmed policy across enrolled devices</p>
+                </div>
+                <span class="small-label">CURRENT STATE</span>
+              </div>
+              <div id="distribution"></div>
+            </section>
+          </div>
+          <div class="grid-two lower-grid">
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Devices needing attention</h2>
+                  <p>Restrictions, pending policies, and learning devices</p>
+                </div>
+                <button class="text-button" data-go="devices">
+                  View all ↗
+                </button>
+              </div>
+              <div id="attention-list"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Recent signals</h2>
+                  <p>Detection and lifecycle activity</p>
+                </div>
+                <button class="text-button" data-go="audit">
+                  Open audit ↗
+                </button>
+              </div>
+              <div id="recent-signals"></div>
+            </section>
+          </div>
+        </section>
+        <section id="view-devices" class="view" hidden>
+          <div class="toolbar">
+            <input
+              id="device-search"
+              type="search"
+              placeholder="Search name or IP address"
+              aria-label="Search devices"
+            /><select id="tier-filter" aria-label="Filter devices by tier">
+              <option value="">All tiers</option>
+              <option>TRUSTED</option>
+              <option>CAUTIOUS</option>
+              <option>QUARANTINE</option>
+              <option value="pending">Enforcement pending</option></select
+            ><span class="small-label"
+              >Select a device to inspect and manage it</span
+            >
+          </div>
+          <div class="panel table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Device</th>
+                  <th>Trust</th>
+                  <th>Desired policy</th>
+                  <th>Confirmed policy</th>
+                  <th>Learning</th>
+                  <th>Model</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="device-rows"></tbody>
+            </table>
+          </div>
+        </section>
+        <section id="view-traffic" class="view" hidden>
+          <div class="toolbar">
+            <select
+              id="traffic-device"
+              aria-label="Filter traffic by device"
+            ></select
+            ><select id="signal-filter" aria-label="Filter traffic by signal">
+              <option value="">All windows</option>
+              <option value="hard">Hard-rule detections</option>
+              <option value="anomaly">ML anomaly scores ≥ 0.50</option>
+              <option value="suppressed">AE-suppressed</option></select
+            ><button id="export-windows" class="button">
+              Export retained windows
+            </button>
+          </div>
+          <div class="panel table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Captured</th>
+                  <th>Device</th>
+                  <th>Packets / bytes</th>
+                  <th>Signal</th>
+                  <th>Score</th>
+                  <th>Trust</th>
+                  <th>Desired policy</th>
+                </tr>
+              </thead>
+              <tbody id="traffic-rows"></tbody>
+            </table>
+          </div>
+          <p class="footnote">
+            Metadata only. Payloads are never stored. Up to 300 recent windows
+            per device are retained; this view loads the latest 300 across
+            devices.
+          </p>
+        </section>
+        <section id="view-trust" class="view" hidden>
+          <div class="toolbar">
+            <select
+              id="trust-device"
+              aria-label="Select device trust history"
+            ></select
+            ><button id="load-history" class="button">
+              Load device history
+            </button>
+          </div>
+          <div class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Trust over time</h2>
+                <p id="trust-caption">
+                  Select a device to inspect its retained trust history.
+                </p>
+              </div>
+              <span class="legend"
+                ><i class="swatch green"></i>Trust score</span
+              >
+            </div>
+            <div id="trust-chart" class="chart trust-chart"></div>
+          </div>
+          <div class="grid-two section-gap">
+            <section class="panel">
+              <div class="panel-heading"><h2>Detection pipeline</h2></div>
+              <div class="pipeline">
+                <div>
+                  <b>01</b
+                  ><span
+                    >Hard-rule guards<small
+                      >SYN, volume, scan entropy, VPN ports</small
+                    ></span
+                  >
+                </div>
+                <div>
+                  <b>02</b
+                  ><span
+                    >Isolation Forest<small
+                      >14 features · device-specific calibration</small
+                    ></span
+                  >
+                </div>
+                <div>
+                  <b>03</b
+                  ><span
+                    >Autoencoder refinement<small
+                      >Local reconstruction-based suppression</small
+                    ></span
+                  >
+                </div>
+                <div>
+                  <b>04</b
+                  ><span
+                    >Adaptive trust & policy<small
+                      >EWMA · signatures · 3 / 10 window gates</small
+                    ></span
+                  >
+                </div>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading"><h2>Device intelligence</h2></div>
+              <div id="intelligence"></div>
+            </section>
+          </div>
+        </section>
+        <section id="view-topology" class="view" hidden>
+          <div class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>The local enforcement boundary</h2>
+                <p>
+                  Logical topology based on configuration and enrolled devices
+                </p>
+              </div>
+              <span class="badge neutral">NOT A DISCOVERY SCAN</span>
+            </div>
+            <div class="topology-toolbar">
+              <div class="topology-legend">
+                <span class="badge green">TRUSTED</span
+                ><span class="badge amber">CAUTIOUS</span
+                ><span class="badge red">QUARANTINE</span
+                ><span class="badge neutral">PENDING / UNKNOWN</span>
+              </div>
+              <button id="topology-motion" class="button" aria-pressed="false">
+                Pause animation
+              </button>
+            </div>
+            <div
+              class="topology-stage"
+              aria-label="Animated logical network topology"
+            >
+              <svg
+                id="topology-svg"
+                role="img"
+                aria-label="Enrolled devices connected to the local TrustEdge gateway and configured upstream router"
+              ></svg>
+            </div>
+            <div class="topology-pagination">
+              <span id="topology-client-count">0 enrolled</span
+              ><span id="topology-gateway"></span><span id="topology-wan"></span
+              ><button id="topology-prev" class="button">← Previous</button
+              ><span id="topology-page">Page 1</span
+              ><button id="topology-next" class="button">Next →</button>
+            </div>
+            <div id="topology-devices" class="topology-devices"></div>
+            <div class="panel-foot">
+              Animated dots illustrate policy paths, not measured packets.
+              Quarantined paths terminate at the gateway (DNS exceptions are not
+              animated). Traffic between peers on the same switch may bypass
+              routing. Use switch / AP isolation when lateral enforcement is
+              required.
+            </div>
+          </div>
+        </section>
+        <section id="view-audit" class="view" hidden>
+          <div class="toolbar">
+            <input
+              id="audit-search"
+              type="search"
+              placeholder="Search action, device, or details"
+              aria-label="Search audit events"
+            /><select id="audit-filter" aria-label="Filter audit events">
+              <option value="">All actions</option>
+              <option value="failure">Failures</option>
+              <option value="tier_changed">Tier changes</option>
+              <option value="lifecycle">Device lifecycle</option></select
+            ><button id="export-events" class="button">
+              Export audit JSON
+            </button>
+          </div>
+          <div class="panel table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Action</th>
+                  <th>Device</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="audit-rows"></tbody>
+            </table>
+          </div>
+          <p class="footnote">
+            Latest 200 audit events. SQLite retains up to 10,000. Successful
+            tier changes are recorded after enforcement confirms success.
+          </p>
+        </section>
+        <section id="view-system" class="view" hidden>
+          <div id="system-cards" class="metrics"></div>
+          <div class="grid-two">
+            <section class="panel">
+              <div class="panel-heading"><h2>Gateway & capture</h2></div>
+              <div id="system-details"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading"><h2>Local data & security</h2></div>
+              <div class="detail-list">
+                <div><span>Telemetry uploads</span><b>None</b></div>
+                <div><span>Cloud model updates</span><b>None</b></div>
+                <div>
+                  <span>Assets / charts / fonts</span><b>Bundled locally</b>
+                </div>
+                <div><span>API access</span><b>Loopback + bearer token</b></div>
+                <div><span>Token storage</span><b>Memory only</b></div>
+                <div><span>Persistent storage</span><b>SQLite WAL</b></div>
+                <div><span>Packet payload storage</span><b>Disabled</b></div>
+                <div>
+                  <span>Window retention</span
+                  ><b>300 / device · 10,000 total</b>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+        <footer>
+          <span>TrustEdge / Phase 02</span
+          ><span>Built for the edge. Kept on the edge.</span
+          ><span id="footer-mode">Local gateway console</span>
+        </footer>
+      </main>
+    </div>
+    <dialog id="connect-dialog" aria-labelledby="connect-title">
+      <form id="connect-form">
+        <div class="modal-brand">T›</div>
+        <div class="eyebrow">YOUR LOCAL CONTROL ROOM</div>
+        <h2 id="connect-title">Connect to TrustEdge</h2>
+        <p>
+          Enter your gateway API token. It stays in memory for this tab and is
+          never saved to browser storage.
+        </p>
+        <label
+          >API token<input
+            id="api-token"
+            type="password"
+            required
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Enter TRUSTEDGE_API_TOKEN"
+        /></label>
+        <p id="connect-error" class="form-error" role="alert"></p>
+        <button class="button primary full" type="submit">
+          Open gateway console →
+        </button>
+        <div class="modal-note">
+          ◈ Local assets. Local models. No cloud telemetry.
+        </div>
+      </form>
+    </dialog>
+    <dialog id="device-dialog" aria-labelledby="detail-title">
+      <div class="modal-heading">
+        <div>
+          <div class="eyebrow">DEVICE INSPECTOR</div>
+          <h2 id="detail-title">Device</h2>
+        </div>
+        <button
+          class="icon-button"
+          data-close="device-dialog"
+          aria-label="Close inspector"
+        >
+          ×
+        </button>
+      </div>
+      <div id="device-detail"></div>
+      <div class="action-grid">
+        <button id="edit-device" class="button">Edit destinations</button
+        ><button id="rebaseline-device" class="button">Rebaseline</button
+        ><button id="release-device" class="button">Release to cautious</button
+        ><button id="delete-device" class="button danger">Remove device</button>
+      </div>
+      <div id="simulation-actions" class="simulation-box" hidden>
+        <div class="eyebrow">EXPLICIT SIMULATION ONLY</div>
+        <p>
+          Generate one fixture window. Scans lower trust gradually; tier
+          downgrades require consecutive anomalous windows. No packets are sent
+          and no real firewall is changed.
+        </p>
+        <div class="action-grid">
+          <button id="simulate-normal" class="button">Normal window</button
+          ><button id="simulate-attack" class="button danger">
+            Simulated scan
+          </button>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="enroll-dialog" aria-labelledby="enroll-title">
+      <form id="enroll-form">
+        <div class="modal-heading">
+          <h2 id="enroll-title">Enroll a device</h2>
+          <button
+            type="button"
+            class="icon-button"
+            data-close="enroll-dialog"
+            aria-label="Close enrollment"
+          >
+            ×
+          </button>
+        </div>
+        <p>
+          New devices start CAUTIOUS. Enrollment does not grant unrestricted
+          access.
+        </p>
+        <label
+          >Device name<input
+            name="name"
+            maxlength="80"
+            required
+            placeholder="Living room camera" /></label
+        ><label
+          >Reserved IPv4 address<input
+            name="ip"
+            required
+            placeholder="192.168.50.2"
+        /></label>
+        <div class="form-grid">
+          <label
+            >Device profile<select
+              name="device_type"
+              id="device-type"
+            ></select></label
+          ><label
+            >Expected rate<input
+              name="rate"
+              type="number"
+              min="0.01"
+              max="10000"
+              step="any"
+              value="5"
+              required
+          /></label>
+        </div>
+        <label
+          >Expected destination IPv4 addresses<textarea
+            name="destinations"
+            rows="3"
+            placeholder="One per line or separated by commas"
+          ></textarea>
+        </label>
+        <p id="enroll-error" class="form-error" role="alert"></p>
+        <button class="button primary full" type="submit">
+          Enroll in local registry
+        </button>
+      </form>
+    </dialog>
+    <dialog id="action-dialog" aria-labelledby="action-title">
+      <form id="action-form">
+        <div class="modal-heading">
+          <h2 id="action-title">Confirm action</h2>
+          <button
+            type="button"
+            class="icon-button"
+            data-close="action-dialog"
+            aria-label="Cancel action"
+          >
+            ×
+          </button>
+        </div>
+        <p id="action-description"></p>
+        <div id="action-fields"></div>
+        <p id="action-error" class="form-error" role="alert"></p>
+        <div class="action-grid">
+          <button type="button" class="button" data-close="action-dialog">
+            Cancel</button
+          ><button id="action-submit" class="button primary" type="submit">
+            Confirm
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <div id="toast" role="status" hidden></div>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+add table inet trustedge
+delete table inet trustedge
+table inet trustedge {
+chain input { type filter hook input priority -10; policy accept;
+iifname "eth1" meta nfproto ipv6 drop
+iifname "eth1" udp sport 68 udp dport 67 accept
+iifname "eth1" ip daddr 192.168.50.1 udp dport 53 limit rate 10/second accept
+iifname "eth1" ip daddr 192.168.50.1 tcp dport 53 limit rate 10/second accept
+iifname "eth1" drop
+}
+chain forward { type filter hook forward priority -10; policy accept;
+iifname "eth1" meta nfproto ipv6 drop
+oifname "eth1" meta nfproto ipv6 drop
+iifname "eth1" ip saddr != 192.168.50.0/24 drop
+iifname "eth1" drop
+oifname "eth1" drop
+}
+}
