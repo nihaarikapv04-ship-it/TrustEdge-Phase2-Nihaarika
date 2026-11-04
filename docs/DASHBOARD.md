@@ -2,6 +2,10 @@
 
 The dashboard is bundled with the Python gateway and served at `http://127.0.0.1:8080/`. No frontend build step, Node runtime on the Pi, cloud hosting, CDN, external fonts or remote chart libraries are needed. HTML/CSS/JavaScript assets are included in the installed Python wheel.
 
+## Phase 1 dashboard (compatibility UI)
+
+The original Phase 1 HTML dashboard is served at `http://127.0.0.1:8080/phase1` with a compatibility API under `/p1/*`. Sign in with any username and the gateway bearer token as the password. The Phase 2 local console remains at `/`. Cloud telemetry, WebSocket push, and per-user RBAC are stubbed or omitted; core device/status/history/topology/lift/rebaseline/attack-in-simulation paths are mapped to the Phase 2 gateway.
+
 ## Simplest launch — no token copying
 
 On this Mac, double-click **Dashboard.command** in the workspace. Or run:

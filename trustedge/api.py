@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from .policy import PolicyError
 from .detection import DetectionError
 from .simulation import fixture
+from . import phase1_compat
 
 class LocalServer(HTTPServer):
     def __init__(self, address, gateway, token, mode, collector=None, topology=None, pairing_code=None,
@@ -43,7 +44,10 @@ class Handler(BaseHTTPRequestHandler):
     def static_asset(self, path):
         assets = {'/': ('index.html','text/html; charset=utf-8'),
                   '/dashboard.css': ('dashboard.css','text/css; charset=utf-8'),
-                  '/dashboard.js': ('dashboard.js','text/javascript; charset=utf-8')}
+                  '/dashboard.js': ('dashboard.js','text/javascript; charset=utf-8'),
+                  '/phase1': ('phase1.html','text/html; charset=utf-8'),
+                  '/phase1/': ('phase1.html','text/html; charset=utf-8'),
+                  '/phase1/dashboard': ('phase1.html','text/html; charset=utf-8')}
         if path not in assets:
             return False
         name, content_type = assets[path]
@@ -55,7 +59,19 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options','nosniff')
         self.send_header('X-Frame-Options','DENY')
         self.send_header('Referrer-Policy','no-referrer')
-        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        # Phase 1 UI still loads Chart.js / fonts from CDN; Phase 2 console stays self-hosted.
+        if name == 'phase1.html':
+            csp = ("default-src 'self'; "
+                   "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                   "font-src 'self' https://fonts.gstatic.com data:; "
+                   "connect-src 'self'; img-src 'self' data:; "
+                   "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        else:
+            csp = ("default-src 'self'; script-src 'self'; style-src 'self'; "
+                   "connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; "
+                   "base-uri 'none'; form-action 'self'")
+        self.send_header('Content-Security-Policy', csp)
         self.end_headers()
         self.wfile.write(data)
         return True
@@ -85,6 +101,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.command == 'POST' and url.path == '/session/pair':
             return self.pair_session()
+        if url.path == '/p1' or url.path.startswith('/p1/'):
+            return self.phase1_dispatch(url)
         expected = 'Bearer ' + self.server.token
         if not hmac.compare_digest(self.headers.get('Authorization', '').encode(), expected.encode()):
             return self.reply(401, {'error': 'authentication required'})
@@ -151,6 +169,26 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(404, {'error': 'missing device or required field'})
         except (ValueError, TypeError) as exc:
             return self.reply(400, {'error': str(exc)})
+
+    def phase1_dispatch(self, url):
+        expected = 'Bearer ' + self.server.token
+        authorized = hmac.compare_digest(self.headers.get('Authorization', '').encode(), expected.encode())
+        body = {}
+        if self.command in ('POST', 'PATCH'):
+            size = int(self.headers.get('Content-Length', '0'))
+            if size < 0 or size > 8192:
+                return self.reply(413, {'status': 'error', 'message': 'body too large'})
+            raw = self.rfile.read(size) if size else b'{}'
+            try:
+                body = json.loads(raw or b'{}')
+            except json.JSONDecodeError:
+                return self.reply(400, {'status': 'error', 'message': 'invalid JSON'})
+            if not isinstance(body, dict):
+                return self.reply(400, {'status': 'error', 'message': 'JSON object required'})
+        sub = url.path[len('/p1'):] or '/'
+        code, payload = phase1_compat.handle(
+            self.server, self.command, sub, parse_qs(url.query), body, authorized)
+        return self.reply(code, payload)
 
     do_GET = dispatch
     do_POST = dispatch

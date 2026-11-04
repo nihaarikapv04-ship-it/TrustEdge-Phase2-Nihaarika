@@ -64,7 +64,7 @@ To start a separate demonstration without deleting the existing one, choose an u
 
 Simulation never starts live capture or changes the host firewall. Simulation and live databases cannot be used interchangeably. The simple launcher always starts simulation; attaching a Pi or a device does not turn it into live operation.
 
-For all seven dashboard pages, access details, and troubleshooting, see the [dashboard guide](docs/DASHBOARD.md).
+For all seven dashboard pages, access details, and troubleshooting, see the [dashboard guide](docs/DASHBOARD.md). The original Phase 1 UI is also available at `/phase1` (compatibility API under `/p1`); the Phase 2 console stays at `/`.
 
 ## Docker Compose lab (local only)
 
