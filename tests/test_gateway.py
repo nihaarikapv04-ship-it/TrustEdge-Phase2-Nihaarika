@@ -40,8 +40,7 @@ class GatewayTests(unittest.TestCase):
         self.store.close()
         self.temp.cleanup()
     def quarantine(self):
-        for _ in range(3):
-            self.g.window(IP, fixture(IP, True), 60)
+        self.g.window(IP, fixture(IP, True), 60)
 
     def state(self):
         return self.store.devices()[IP]
@@ -52,8 +51,6 @@ class GatewayTests(unittest.TestCase):
         self.g.reconcile()
 
     def test_failed_quarantine_does_not_claim_success_and_recovers_after_restart(self):
-        for _ in range(2):
-            self.g.window(IP, fixture(IP, True), 60)
         self.policy.fail = True
         with self.assertRaises(PolicyError):
             self.g.window(IP, fixture(IP, True), 60)
@@ -65,7 +62,7 @@ class GatewayTests(unittest.TestCase):
         self.policy.fail = False
         self.restart()
         self.assertEqual(self.state()['applied_tier'], 'QUARANTINE')
-        self.assertEqual(self.state()['trust'], .384)
+        self.assertEqual(self.state()['trust'], .1)
         self.assertEqual(self.policy.installed[IP], 'QUARANTINE')
 
     def test_failed_deletion_is_retryable_and_not_resurrected(self):
@@ -89,7 +86,7 @@ class GatewayTests(unittest.TestCase):
         self.g.rebaseline(IP)
         self.restart()
         d = self.state()
-        self.assertEqual((d['trust'], d['desired_tier'], d['applied_tier']), (.384, 'QUARANTINE', 'QUARANTINE'))
+        self.assertEqual((d['trust'], d['desired_tier'], d['applied_tier']), (.1, 'QUARANTINE', 'QUARANTINE'))
         self.assertEqual(d['baseline'], [])
         self.assertEqual(d['generation'], 1)
         for _ in range(12):

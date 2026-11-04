@@ -33,7 +33,7 @@ To reopen that simulation database after stopping the demo:
 .venv/bin/python -m trustedge --mode simulation --database dashboard-demo.sqlite
 ```
 
-You can also start a new empty simulation database with that command and enroll devices through the dashboard. Normal-window and simulated-scan controls appear only in simulation mode and generate one fixture window per click. A scan records a high-confidence detection and lowers trust gradually; three consecutive anomalous windows are needed for each one-tier downgrade. A benign learning window interrupts that streak. Existing saved quarantine states are preserved; use explicit release to retry a device. The model requires 50 eligible baseline windows; normal recovery requires ten qualifying detection windows.
+You can also start a new empty simulation database with that command and enroll devices through the dashboard. Normal-window and simulated-scan controls appear only in simulation mode and generate one fixture window per click. A simulated hard-rule scan forces trust to 0.1 and quarantines immediately (Phase 1 parity). Non-hard ML anomalies still need three consecutive windows per one-tier downgrade. Existing saved quarantine states are preserved; use explicit release to retry a device. The model requires 50 eligible baseline windows; normal recovery requires ten qualifying detection windows.
 
 For real Pi operation, use the reviewed hardware configuration and service from [the deployment guide](PI_DEPLOYMENT.md). Use an SSH tunnel for a remote browser instead of exposing the API:
 

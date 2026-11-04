@@ -53,7 +53,7 @@ No trained weights were found in GitHub. The import tool can load separately sav
 ## Deliberate safety differences
 
 - New and learning devices are CAUTIOUS; deleted/unknown devices cannot forward. No management-IP detection exemptions are carried over.
-- Hard-rule detections retain score 1.0 but use gradual EWMA degradation and the same three-consecutive-window downgrade validation as other anomalies. Transitions proceed one tier at a time (TRUSTED → CAUTIOUS → QUARANTINE). Existing connections do not bypass confirmed restrictions.
+- Hard-rule detections retain score 1.0, force trust to 0.1, and quarantine immediately (Phase 1 parity). Non-hard ML transitions proceed one tier at a time after three consecutive anomalous windows (TRUSTED → CAUTIOUS → QUARANTINE). Existing connections do not bypass confirmed restrictions. See [POLICY_CORRECTIONS.md](POLICY_CORRECTIONS.md).
 - Phase 1's signature thresholds (.70 → .65 → .55 → .50), severity probes and three-window streak-saturation bypass are retained. Signature validation operates only on vectors in memory, not synthetic network traffic. Counts, streaming centroid/variance, milestone and threshold persist and reset on rebaseline.
 - Quarantine cannot teach a normal baseline or recover automatically from empty/restricted traffic. An audited operator-release action is available via the local dashboard and API. Rebaseline preserves quarantine and trust.
 - Desired tier is persisted before applying policy; the last confirmed applied tier changes only after success. Tombstones and model generations make lifecycle operations retryable across restart.

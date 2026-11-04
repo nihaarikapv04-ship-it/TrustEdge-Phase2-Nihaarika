@@ -18,7 +18,7 @@ The Studio laptop, Living room camera, Office printer, Hallway thermostat, and G
 
 Each example is a saved record containing a name, a pretend device address, a device category, a trust score, and an access level. The demonstration creates example traffic descriptions and passes them through the actual learning and decision code. It does not send those example packets onto your network or change your computer's firewall.
 
-The example records are remembered between launches. A device that was quarantined yesterday can still be quarantined today. Restarting the dashboard does not erase that saved decision. Earlier demonstrations used an immediate-quarantine rule; saved 10 percent scores from those runs can remain even though the rule has since changed.
+The example records are remembered between launches. A device that was quarantined yesterday can still be quarantined today. Restarting the dashboard does not erase that saved decision. Hard-rule scans again force an immediate 10 percent trust score and quarantine, matching Phase 1.
 
 The demonstration deliberately includes different device states so you can explore the dashboard. Its Guest device is given repeated scan activity to show a confirmed quarantine. The other examples may change when you try the simulation buttons or management actions.
 
@@ -73,7 +73,7 @@ The project carries over the Phase 1 measurement order, preparation of those mea
 
 The original trained model files were not present in the GitHub repository. Therefore, the code can train new models from real device behavior, but it cannot recover your old trained results from the source code alone. If separately saved Phase 1 model files are available, your friend can import trusted compatible copies using the instructions in `docs/PHASE1_ML.md`.
 
-The behavior that chooses access levels has intentional changes. In particular, a scan no longer forces an immediate 10 percent score and quarantine. The Phase 1 GitHub repository remains unchanged and has never been pushed to.
+Hard-rule scan behaviour matches Phase 1 (immediate 10 percent trust and quarantine). Other intentional access-level corrections are listed in `docs/POLICY_CORRECTIONS.md`. The Phase 1 GitHub repository remains unchanged and has never been pushed to.
 
 ## 5 What the access levels mean
 
@@ -85,7 +85,7 @@ The behavior that chooses access levels has intentional changes. In particular, 
 
 New devices begin CAUTIOUS while learning. A learning device can show a 75 percent score and still be CAUTIOUS; it has not completed the evidence needed for broader access.
 
-Repeated suspicious behavior lowers trust gradually. A downgrade needs three consecutive qualifying suspicious observation periods. Each downgrade moves one level, from TRUSTED to CAUTIOUS or from CAUTIOUS to QUARANTINE. The score must also support that restriction. One scan from an otherwise healthy or newly enrolled device does not automatically quarantine it.
+A hard-rule detection such as a port scan forces trust to 10 percent and quarantines immediately. Other ML-detected suspicious behavior lowers trust gradually: three consecutive qualifying periods are needed, and each downgrade moves one level (TRUSTED → CAUTIOUS → QUARANTINE).
 
 A recovery decision needs ten qualifying normal observation periods. Once a device is quarantined, the project does not automatically release it just because its now-restricted traffic looks quiet. An operator must review it and use **Release to cautious**, giving a reason. That action sets trust to 55 percent and grants only limited access.
 
@@ -273,7 +273,7 @@ Record the date, the Pi operating-system version, and the person checking each i
 
 - A device not added to the project cannot forward ordinary traffic.
 - CAUTIOUS access permits the expected listed destinations and blocks other ordinary destinations.
-- Repeated suspicious test periods cause gradual, confirmed restrictions rather than an immediate quarantine from one scan.
+- A hard-rule scan quarantines immediately; repeated non-hard suspicious periods cause gradual, confirmed one-tier restrictions.
 - QUARANTINE blocks ordinary outgoing traffic, including a connection already open before the restriction.
 - A deliberate reviewed release grants only CAUTIOUS access and records the reason.
 - Restarting learning does not silently release quarantine or grant full access.

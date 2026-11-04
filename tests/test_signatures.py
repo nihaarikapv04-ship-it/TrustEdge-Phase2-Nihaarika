@@ -36,7 +36,7 @@ class SignatureTests(unittest.TestCase):
         self.assertEqual(state['threshold'],.65)
         self.assertEqual(state['count'],11)
 
-    def test_recovery_gate_and_staged_hard_rule_response(self):
+    def test_recovery_gate_and_phase1_immediate_hard_rule_quarantine(self):
         d = new_device('192.168.50.2','camera')
         d['learning'] = False
         for _ in range(9):
@@ -45,15 +45,8 @@ class SignatureTests(unittest.TestCase):
         evaluate(d,0,False)
         self.assertEqual(d['desired_tier'],'TRUSTED')
         evaluate(d,1,True)
-        self.assertEqual(d['desired_tier'],'TRUSTED')
-        self.assertGreater(d['trust'],.75)
-        for _ in range(2): evaluate(d,1,True)
-        self.assertEqual(d['desired_tier'],'CAUTIOUS')
-        for _ in range(2):
-            evaluate(d,1,True)
-            self.assertEqual(d['desired_tier'],'CAUTIOUS')
-        evaluate(d,1,True)
         self.assertEqual(d['desired_tier'],'QUARANTINE')
+        self.assertEqual(d['trust'],.1)
 
     def test_signature_state_and_streaks_survive_service_restart_and_reset(self):
         store=Storage(':memory:','simulation')

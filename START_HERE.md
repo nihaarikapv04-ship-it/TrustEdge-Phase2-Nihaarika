@@ -24,7 +24,7 @@ python3.11 -m venv .venv
 
 The ordinary suite uses local fixtures and a temporary loopback API server. Linux-only network tests skip unless explicitly enabled. No cloud account, cloud endpoint, Docker daemon, or model download is required. Initial dependency installation needs a package source or an offline wheelhouse.
 
-For an offline dashboard demonstration, double-click `Dashboard.command` on macOS, or run `.venv/bin/python -m trustedge.dashboard`. It opens and signs in automatically without manual API token setup. Explicit simulation uses the real Phase 1 ML algorithms and a simulation policy adapter; it never changes the host firewall or starts capture. Fifty eligible normal windows train the IF, then ten qualifying recovery windows allow TRUSTED. A simulated scan lowers trust and records a PORT_SCAN detection. Consecutive anomalous windows validate a staged downgrade; one scan does not force quarantine.
+For an offline dashboard demonstration, double-click `Dashboard.command` on macOS, or run `.venv/bin/python -m trustedge.dashboard`. It opens and signs in automatically without manual API token setup. Explicit simulation uses the real Phase 1 ML algorithms and a simulation policy adapter; it never changes the host firewall or starts capture. Fifty eligible normal windows train the IF, then ten qualifying recovery windows allow TRUSTED. A simulated hard-rule scan forces trust to 0.1 and quarantines immediately (Phase 1 parity). Non-hard ML downgrades remain staged. Intentional corrections are listed in [docs/POLICY_CORRECTIONS.md](docs/POLICY_CORRECTIONS.md).
 
 Generate inspectable deployment files without changing your computer's network:
 

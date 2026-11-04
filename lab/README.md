@@ -46,5 +46,5 @@ docker compose down -v
 
 - Unknown devices remain denied until enrolled; enrollment starts **CAUTIOUS**.
 - Expected destinations for lab devices are `172.21.0.10` (webserver) and `172.21.0.11` (wan-sink).
-- Detection windows are 60 seconds (Phase 1 contract). Hard-rule hits score 1.0 but still require Phase 2’s three-window, one-tier downgrade gates.
+- Detection windows are 60 seconds (Phase 1 contract). Hard-rule hits force trust to 0.1 and quarantine immediately (Phase 1 parity).
 - This lab exercises container routing and Phase 2 live capture/policy. It is not a substitute for Pi commissioning.

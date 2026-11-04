@@ -51,7 +51,7 @@ The launcher saves its simulation state in `dashboard-local.sqlite` and reuses i
 
 Use the dashboard to inspect devices, view trust and traffic history, explore the animated topology, and try the clearly labeled simulation buttons. You can also enroll devices, edit expected destinations, release quarantine with a reason, restart learning, and remove devices through the dashboard.
 
-- One scan lowers trust and records a detection; it does not force immediate quarantine. Repeated suspicious windows validate one-tier downgrades.
+- A hard-rule detection (for example a port scan) forces trust to 0.1 and quarantines immediately, matching Phase 1. Non-hard ML anomalies still require three consecutive windows and move one tier at a time.
 - **Release to cautious** is the explicit way to give a reviewed quarantined device limited access again.
 - **Rebaseline** starts learning again and does not release quarantine.
 - “Confirmed policy” in simulation means the simulation accepted the decision; no real firewall was changed.
@@ -106,7 +106,7 @@ The default detector now integrates Phase 1's **14-feature extraction, StandardS
 
 ## Policy and recovery semantics
 
-- A hard-rule detection scores 1.0 without forcing trust to 0.1. EWMA degradation, three consecutive anomalous windows and one-tier downgrades govern the response; recovery requires ten qualifying normal windows.
+- A hard-rule detection scores 1.0, forces trust to 0.1, and quarantines immediately (Phase 1 parity). Non-hard ML anomalies use EWMA plus three consecutive windows with one-tier downgrades. Quarantine does not auto-recover; use explicit release. See [policy corrections](docs/POLICY_CORRECTIONS.md).
 - Enrollment begins CAUTIOUS. TRUSTED allows outbound traffic and established replies. CAUTIOUS allows rate-limited HTTP/HTTPS only to explicitly configured destinations, plus configured DNS. QUARANTINE allows only configured DNS; local DHCP remains available. Per-rule limits are packet rates, not bandwidth shaping.
 - Rules are ordered explicitly within a single nft batch. No broad established-flow rule bypasses quarantine. Both forward directions are restricted, so an existing connection cannot continue through a tier downgrade. Unknown devices remain denied after deletion.
 - Desired policy is committed before enforcement. `applied_tier` changes only after a zero exit status from nft. Rejections, missing binaries and timeouts return HTTP 503 and mark the service unready; intent survives for retry. A timeout is an uncertain outcome, never reported as success.
