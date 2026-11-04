@@ -23,8 +23,12 @@ def host_health(database_path):
     except (OSError, ValueError):
         pass
     disk = shutil.disk_usage(Path(database_path).resolve().parent)
+    try:
+        load_average = list(os.getloadavg())
+    except OSError:
+        load_average = None
     return dict(uptime_seconds=int(time.monotonic()-STARTED), cpu_count=os.cpu_count(),
-                load_average=list(os.getloadavg()), memory=memory, temperature_c=temperature,
+                load_average=load_average, memory=memory, temperature_c=temperature,
                 disk=dict(total=disk.total, free=disk.free))
 
 

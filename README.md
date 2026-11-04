@@ -66,6 +66,10 @@ Simulation never starts live capture or changes the host firewall. Simulation an
 
 For all seven dashboard pages, access details, and troubleshooting, see the [dashboard guide](docs/DASHBOARD.md).
 
+## Docker Compose lab (local only)
+
+For Phase 1-style multi-container evaluation on this machine, see [`lab/README.md`](lab/README.md). The lab runs the Phase 2 backend with Phase 1 LAN/WAN device containers. It does not replace Pi deployment and does not enable cloud telemetry.
+
 ## Raspberry Pi deployment
 
 Deployment is prepared for a Pi 4 with built-in Ethernet WAN and a USB Ethernet LAN. It uses native Python/systemd, local dnsmasq and nftables, with no Docker or cloud services. See [the deployment guide](docs/PI_DEPLOYMENT.md) for wiring, configuration, artifact installation and hardware acceptance tests.

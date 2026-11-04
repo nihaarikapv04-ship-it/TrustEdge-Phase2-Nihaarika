@@ -17,11 +17,13 @@ def main():
     parser.add_argument('--subnet')
     parser.add_argument('--dns')
     parser.add_argument('--port', type=int, default=None)
+    parser.add_argument('--bind', default=None,
+                        help='127.0.0.1 (default) or 0.0.0.0 for Docker lab only')
     args = parser.parse_args()
     topology = None
     if args.config:
-        if any((args.mode, args.database, args.lan, args.wan, args.subnet, args.dns, args.port)):
-            parser.error('--config cannot be combined with network/mode/database/port overrides')
+        if any((args.mode, args.database, args.lan, args.wan, args.subnet, args.dns, args.port, args.bind)):
+            parser.error('--config cannot be combined with network/mode/database/port/bind overrides')
         from .config import PiConfig
         config = PiConfig.load(args.config)
         args.mode, args.database = 'live', config.database
@@ -31,6 +33,12 @@ def main():
     if not args.mode or not args.database:
         parser.error('provide --config, or both --mode and --database')
     args.port = args.port or 8080
+    bind = args.bind or os.environ.get('TRUSTEDGE_BIND', '127.0.0.1')
+    lab_bind = os.environ.get('TRUSTEDGE_LAB_BIND', '') == '1'
+    if bind not in ('127.0.0.1', '0.0.0.0'):
+        parser.error('--bind must be 127.0.0.1 or 0.0.0.0')
+    if bind != '127.0.0.1' and not lab_bind:
+        parser.error('non-loopback bind requires TRUSTEDGE_LAB_BIND=1 (Docker lab only)')
     token = os.environ.get('TRUSTEDGE_API_TOKEN', '')
     if len(token) < 24:
         parser.error('set TRUSTEDGE_API_TOKEN to at least 24 characters')
@@ -44,7 +52,8 @@ def main():
     # Never begin capture or expose a ready service until startup policy is installed.
     gateway.reconcile()
     collector = LiveCollector(gateway, args.lan) if args.mode == 'live' else None
-    server = LocalServer(('127.0.0.1', args.port), gateway, token, args.mode, collector, topology)
+    server = LocalServer((bind, args.port), gateway, token, args.mode, collector, topology,
+                         allow_non_loopback=lab_bind)
     stop = threading.Event()
     def retry():
         while not stop.wait(5):

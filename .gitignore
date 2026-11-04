@@ -9,3 +9,7 @@ build/
 tmp/
 *.egg-info/
 .DS_Store
+
+# Docker lab local state
+lab/.env
+lab/.env.token

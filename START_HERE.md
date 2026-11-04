@@ -1,6 +1,6 @@
 # TrustEdge Phase 2 — developer handoff
 
-This repository is a **hardware-independent development base** for a local Raspberry Pi gateway. No Pi is needed to develop or run the standard tests. The reference GitHub repository remains read-only; no changes are pushed to it. Docker and cloud telemetry are not part of the runtime.
+This repository is a **hardware-independent development base** for a local Raspberry Pi gateway. No Pi is needed to develop or run the standard tests. The reference GitHub repository remains read-only; no changes are pushed to it. Cloud telemetry is not part of the runtime. An optional Docker Compose lab under [`lab/`](lab/README.md) exercises Phase 1 device containers against the Phase 2 backend; Pi deployment remains native systemd/nft.
 
 For a nontechnical walkthrough, read [the plain language project and Pi guide](docs/PLAIN_LANGUAGE_HANDOVER.md).
 

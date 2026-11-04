@@ -169,6 +169,12 @@ class GatewayTests(unittest.TestCase):
             thread.join()
             server.server_close()
 
+    def test_non_loopback_bind_requires_explicit_lab_flag(self):
+        with self.assertRaises(ValueError):
+            LocalServer(('0.0.0.0', 0), self.g, 'a'*24, 'simulation')
+        server = LocalServer(('0.0.0.0', 0), self.g, 'a'*24, 'simulation', allow_non_loopback=True)
+        server.server_close()
+
 class PolicyTests(unittest.TestCase):
     def test_nonzero_exit_and_os_error_and_timeout_are_failures(self):
         for outcome in (subprocess.CompletedProcess([], 1, '', 'rejected'), FileNotFoundError('nft'), subprocess.TimeoutExpired('nft', 10)):

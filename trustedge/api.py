@@ -11,9 +11,13 @@ from .detection import DetectionError
 from .simulation import fixture
 
 class LocalServer(HTTPServer):
-    def __init__(self, address, gateway, token, mode, collector=None, topology=None, pairing_code=None):
-        if address[0] != '127.0.0.1':
-            raise ValueError('API must bind to IPv4 loopback')
+    def __init__(self, address, gateway, token, mode, collector=None, topology=None, pairing_code=None,
+                 allow_non_loopback=False):
+        # Production and Pi stay on loopback. Docker lab may bind 0.0.0.0 when explicitly opted in.
+        if address[0] not in ('127.0.0.1', '0.0.0.0'):
+            raise ValueError('API bind must be 127.0.0.1 or 0.0.0.0')
+        if address[0] != '127.0.0.1' and not allow_non_loopback:
+            raise ValueError('API must bind to IPv4 loopback unless lab bind is explicitly enabled')
         self.gateway, self.token, self.mode, self.collector = gateway, token, mode, collector
         if pairing_code is not None and mode != 'simulation':
             raise ValueError('automatic pairing is only available in the explicit simulation launcher')

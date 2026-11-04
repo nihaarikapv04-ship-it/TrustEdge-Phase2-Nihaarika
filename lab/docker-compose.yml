@@ -1,0 +1,125 @@
+# Local Docker Compose lab: Phase 1 device/WAN topology + Phase 2 backend.
+# Does not replace Pi deployment. Omits Phase 1 cloud telemetry, SMTP and MailHog.
+# WAN sink at 172.21.0.11 preserves Phase 1 device destination IPs without gateway uploads.
+
+networks:
+  lan:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  wan:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+
+services:
+  firewall:
+    build:
+      context: ..
+      dockerfile: lab/firewall/Dockerfile
+    container_name: trustedge-lab-firewall
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    networks:
+      lan:
+        ipv4_address: 172.20.0.2
+      wan:
+        ipv4_address: 172.21.0.2
+    ports:
+      - "8080:8080"
+      - "5001:8080"
+    environment:
+      - TRUSTEDGE_API_TOKEN=${TRUSTEDGE_API_TOKEN:?set TRUSTEDGE_API_TOKEN to at least 24 characters}
+      - TRUSTEDGE_LAB_BIND=1
+      - TRUSTEDGE_BIND=0.0.0.0
+    volumes:
+      - lab-db:/var/lib/trustedge
+    depends_on:
+      - webserver
+      - wan-sink
+      - dns
+
+  laptop:
+    build: ./containers/laptop
+    container_name: trustedge-lab-laptop
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan:
+        ipv4_address: 172.20.0.10
+    depends_on:
+      - firewall
+
+  iot-camera:
+    build: ./containers/iot-camera
+    container_name: trustedge-lab-iot-camera
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan:
+        ipv4_address: 172.20.0.11
+    depends_on:
+      - firewall
+
+  iot-thermostat:
+    build: ./containers/iot-thermostat
+    container_name: trustedge-lab-iot-thermostat
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan:
+        ipv4_address: 172.20.0.12
+    depends_on:
+      - firewall
+
+  phone:
+    build: ./containers/phone
+    container_name: trustedge-lab-phone
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan:
+        ipv4_address: 172.20.0.13
+    depends_on:
+      - firewall
+
+  printer:
+    build: ./containers/printer
+    container_name: trustedge-lab-printer
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan:
+        ipv4_address: 172.20.0.14
+    depends_on:
+      - firewall
+
+  webserver:
+    build: ./containers/webserver
+    container_name: trustedge-lab-webserver
+    networks:
+      wan:
+        ipv4_address: 172.21.0.10
+
+  wan-sink:
+    build: ./containers/wan-sink
+    container_name: trustedge-lab-wan-sink
+    networks:
+      wan:
+        ipv4_address: 172.21.0.11
+
+  dns:
+    build: ./containers/dns
+    container_name: trustedge-lab-dns
+    networks:
+      wan:
+        ipv4_address: 172.21.0.12
+
+volumes:
+  lab-db:

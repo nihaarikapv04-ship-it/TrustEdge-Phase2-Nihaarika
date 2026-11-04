@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>TrustEdge Test Server</title></head>
+<body>
+<h1>TrustEdge Web Server</h1>
+<p>Simulation target for LAN device traffic.</p>
+<a href="/about">About</a> | <a href="/ping">Ping</a>
+</body>
+</html>
+```
+
+---
+
+**`containers/cloudapi/Dockerfile`**
+```
+FROM python:3.11-slim
+RUN pip install flask
+WORKDIR /app
+COPY app.py /app/app.py
+CMD ["python3", "app.py"]
