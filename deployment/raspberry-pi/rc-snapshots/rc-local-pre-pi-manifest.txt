@@ -1,0 +1,50 @@
+tag=rc-local-pre-pi
+created_utc=2026-11-04T11:16:34Z
+branch=phase2-integration
+head=297354c256323aaf56cf2656044e4f17efca2058
+short=297354c
+
+== status (may include uncommitted RC fixes) ==
+## phase2-integration...origin/phase2-integration
+ M .gitignore
+ M docs/DASHBOARD.md
+ M docs/POLICY_CORRECTIONS.md
+ M lab/README.md
+ M lab/containers/iot-camera/traffic_gen.sh
+ M lab/containers/iot-thermostat/traffic_gen.sh
+ M lab/containers/laptop/traffic_gen.sh
+ M lab/containers/phone/traffic_gen.sh
+ M lab/containers/printer/traffic_gen.sh
+ M lab/docker-compose.yml
+ M lab/firewall/entrypoint.sh
+ M tests/test_gateway.py
+ M tests/test_phase1_compat.py
+ M trustedge/__main__.py
+ M trustedge/api.py
+ M trustedge/collection.py
+ M trustedge/dashboard.py
+ M trustedge/phase1_compat.py
+ M trustedge/policy.py
+ M trustedge/simulation.py
+ M trustedge/static/phase1.html
+ M trustedge/storage.py
+?? deployment/
+?? docs/CLEANUP_REPORT.md
+?? docs/FIREWALL_PATH_REPORT.md
+?? docs/LOCAL_PARITY_REPORT.md
+?? lab/containers/_common/
+?? lab/results/
+?? lab/scripts/comm_smoke_test.sh
+?? lab/scripts/live_three_window_validate.py
+?? lab/scripts/prove_firewall_path.sh
+?? lab/scripts/wait_device_ready.py
+?? tests/test_phase1_auth.py
+?? tests/test_phase1_pipeline_parity.py
+?? trustedge/phase1_auth.py
+
+== key paths ==
+docs/LOCAL_PARITY_REPORT.md
+deployment/raspberry-pi/
+lab/
+trustedge/
+deploy/

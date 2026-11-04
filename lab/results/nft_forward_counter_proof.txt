@@ -1,0 +1,7 @@
+=== nft forward counter proof ===
+timestamp: 2026-11-04T checkpoint
+BEFORE: laptop=0 thermo=0
+MID (during HTTP generation): laptop=1/60B thermo=1/60B
+AFTER: verify rules removed by policy rewrite (~5s window) — expected
+Isolation: laptop HTTP=000 (QUARANTINE), thermo HTTP=200 (CAUTIOUS after operator release)
+isolation_proven_earlier_this_session laptop=000 thermo=200 after operator release

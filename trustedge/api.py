@@ -1,17 +1,25 @@
 """Loopback-only HTTP adapter. No cloud routes, CDN assets, or capture logic."""
+import base64
+import hashlib
 import hmac
 import json
+import struct
 import time
-from pathlib import Path
-from urllib.parse import urlsplit, parse_qs
-from .dashboard import snapshot
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from .policy import PolicyError
-from .detection import DetectionError
-from .simulation import fixture
-from . import phase1_compat
+from pathlib import Path
+from socketserver import ThreadingMixIn
+from urllib.parse import parse_qs, urlsplit
 
-class LocalServer(HTTPServer):
+from . import phase1_auth, phase1_compat
+from .dashboard import snapshot
+from .detection import DetectionError
+from .policy import PolicyError
+from .simulation import fixture
+
+
+class LocalServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+
     def __init__(self, address, gateway, token, mode, collector=None, topology=None, pairing_code=None,
                  allow_non_loopback=False):
         # Production and Pi stay on loopback. Docker lab may bind 0.0.0.0 when explicitly opted in.
@@ -25,7 +33,9 @@ class LocalServer(HTTPServer):
         self.pairing_code = pairing_code
         self.pairing_deadline = time.monotonic() + 120
         self.topology = topology
+        phase1_auth.ensure_seed_users(gateway.storage)
         super().__init__(address, Handler)
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
@@ -42,30 +52,30 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def static_asset(self, path):
-        assets = {'/': ('index.html','text/html; charset=utf-8'),
-                  '/dashboard.css': ('dashboard.css','text/css; charset=utf-8'),
-                  '/dashboard.js': ('dashboard.js','text/javascript; charset=utf-8'),
-                  '/phase1': ('phase1.html','text/html; charset=utf-8'),
-                  '/phase1/': ('phase1.html','text/html; charset=utf-8'),
-                  '/phase1/dashboard': ('phase1.html','text/html; charset=utf-8')}
+        assets = {'/': ('index.html', 'text/html; charset=utf-8'),
+                  '/dashboard.css': ('dashboard.css', 'text/css; charset=utf-8'),
+                  '/dashboard.js': ('dashboard.js', 'text/javascript; charset=utf-8'),
+                  '/phase1': ('phase1.html', 'text/html; charset=utf-8'),
+                  '/phase1/': ('phase1.html', 'text/html; charset=utf-8'),
+                  '/phase1/dashboard': ('phase1.html', 'text/html; charset=utf-8')}
         if path not in assets:
             return False
         name, content_type = assets[path]
         data = Path(__file__).with_name('static').joinpath(name).read_bytes()
         self.send_response(200)
-        self.send_header('Content-Type',content_type)
-        self.send_header('Content-Length',str(len(data)))
-        self.send_header('Cache-Control','no-store')
-        self.send_header('X-Content-Type-Options','nosniff')
-        self.send_header('X-Frame-Options','DENY')
-        self.send_header('Referrer-Policy','no-referrer')
+        self.send_header('Content-Type', content_type)
+        self.send_header('Content-Length', str(len(data)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('Referrer-Policy', 'no-referrer')
         # Phase 1 UI still loads Chart.js / fonts from CDN; Phase 2 console stays self-hosted.
         if name == 'phase1.html':
             csp = ("default-src 'self'; "
                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                    "font-src 'self' https://fonts.gstatic.com data:; "
-                   "connect-src 'self'; img-src 'self' data:; "
+                   "connect-src 'self' ws: wss:; img-src 'self' data:; "
                    "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         else:
             csp = ("default-src 'self'; script-src 'self'; style-src 'self'; "
@@ -80,19 +90,19 @@ class Handler(BaseHTTPRequestHandler):
         origin = f'http://127.0.0.1:{self.server.server_port}'
         if (not self.server.pairing_code or time.monotonic() > self.server.pairing_deadline or
                 self.headers.get('Origin') != origin or self.headers.get('Host') != origin.removeprefix('http://')):
-            return self.reply(403, {'error':'local pairing is unavailable or expired; restart the launcher'})
+            return self.reply(403, {'error': 'local pairing is unavailable or expired; restart the launcher'})
         try:
-            size = int(self.headers.get('Content-Length','0'))
+            size = int(self.headers.get('Content-Length', '0'))
             if not 0 < size <= 1024 or self.headers.get('Content-Type') != 'application/json':
                 raise ValueError('invalid pairing request')
             data = json.loads(self.rfile.read(size))
-            code = data.get('code') if isinstance(data,dict) else None
-            if not isinstance(code,str) or not hmac.compare_digest(code.encode(),self.server.pairing_code.encode()):
-                return self.reply(403, {'error':'invalid local pairing code'})
+            code = data.get('code') if isinstance(data, dict) else None
+            if not isinstance(code, str) or not hmac.compare_digest(code.encode(), self.server.pairing_code.encode()):
+                return self.reply(403, {'error': 'invalid local pairing code'})
         except (ValueError, TypeError):
-            return self.reply(400, {'error':'invalid pairing request'})
+            return self.reply(400, {'error': 'invalid pairing request'})
         self.server.pairing_code = None
-        return self.reply(200, {'token':self.server.token})
+        return self.reply(200, {'token': self.server.token})
 
     def dispatch(self):
         self.connection.settimeout(5)
@@ -101,6 +111,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.command == 'POST' and url.path == '/session/pair':
             return self.pair_session()
+        if url.path in ('/p1/ws', '/p1/ws/'):
+            return self.phase1_websocket()
         if url.path == '/p1' or url.path.startswith('/p1/'):
             return self.phase1_dispatch(url)
         expected = 'Bearer ' + self.server.token
@@ -115,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(url.query)
                 with g.lock:
                     g._device(parts[1])
-                    return self.reply(200, g.storage.windows(parts[1], int(query.get('limit',['300'])[0])))
+                    return self.reply(200, g.storage.windows(parts[1], int(query.get('limit', ['300'])[0])))
             if self.command == 'GET' and parts == ['status']:
                 result = g.status()
                 result['mode'] = self.server.mode
@@ -128,7 +140,7 @@ class Handler(BaseHTTPRequestHandler):
                 with g.lock:
                     return self.reply(200, g.storage.events())
             data = {}
-            if self.command in ('POST','PATCH'):
+            if self.command in ('POST', 'PATCH'):
                 size = int(self.headers.get('Content-Length', '0'))
                 if size < 0 or size > 8192:
                     return self.reply(413, {'error': 'body too large'})
@@ -140,17 +152,17 @@ class Handler(BaseHTTPRequestHandler):
                                 data.get('device_type', 'custom'), data.get('rate', 5))
                 return self.reply(201, {'ip': ip})
             if len(parts) == 2 and parts[0] == 'devices' and self.command == 'PATCH':
-                if set(data) != {'name','destinations'}:
+                if set(data) != {'name', 'destinations'}:
                     raise ValueError('provide name and destinations only')
                 g.update(parts[1], data['name'], data['destinations'])
-                return self.reply(200, {'updated':parts[1]})
+                return self.reply(200, {'updated': parts[1]})
             if len(parts) == 2 and parts[0] == 'devices' and self.command == 'DELETE':
                 g.delete(parts[1])
                 return self.reply(200, {'deleted': parts[1]})
             if len(parts) == 3 and parts[0] == 'devices' and self.command == 'POST':
                 if parts[2] == 'release':
                     g.release(parts[1], data.get('reason'))
-                    return self.reply(200, {'released':parts[1]})
+                    return self.reply(200, {'released': parts[1]})
                 if parts[2] == 'rebaseline':
                     g.rebaseline(parts[1])
                     return self.reply(200, {'rebaselined': parts[1]})
@@ -171,8 +183,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(400, {'error': str(exc)})
 
     def phase1_dispatch(self, url):
-        expected = 'Bearer ' + self.server.token
-        authorized = hmac.compare_digest(self.headers.get('Authorization', '').encode(), expected.encode())
+        header = self.headers.get('Authorization', '')
+        bearer = header[7:] if header.startswith('Bearer ') else None
         body = {}
         if self.command in ('POST', 'PATCH'):
             size = int(self.headers.get('Content-Length', '0'))
@@ -187,11 +199,81 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(400, {'status': 'error', 'message': 'JSON object required'})
         sub = url.path[len('/p1'):] or '/'
         code, payload = phase1_compat.handle(
-            self.server, self.command, sub, parse_qs(url.query), body, authorized)
+            self.server, self.command, sub, parse_qs(url.query), body, bearer)
         return self.reply(code, payload)
+
+    def phase1_websocket(self):
+        """Minimal Phase 1-compatible WS that pushes device snapshots (window_end)."""
+        if self.command != 'GET':
+            return self.reply(405, {'status': 'error', 'message': 'WebSocket upgrade requires GET'})
+        key = self.headers.get('Sec-WebSocket-Key')
+        if self.headers.get('Upgrade', '').lower() != 'websocket' or not key:
+            return self.reply(400, {'status': 'error', 'message': 'expected WebSocket upgrade'})
+        header = self.headers.get('Authorization', '')
+        bearer = header[7:] if header.startswith('Bearer ') else None
+        # Browsers cannot set Authorization on WebSocket; accept token query ?token=
+        url = urlsplit(self.path)
+        query = parse_qs(url.query)
+        if not bearer:
+            token_values = query.get('token') or []
+            bearer = token_values[0] if token_values else None
+        secret = phase1_auth.jwt_secret(self.server.token)
+        if not bearer or phase1_auth.decode_token(bearer, secret) is None:
+            return self.reply(401, {'status': 'error', 'message': 'Invalid or expired token'})
+        accept = base64.b64encode(
+            hashlib.sha1((key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode()).digest()
+        ).decode()
+        self.send_response(101, 'Switching Protocols')
+        self.send_header('Upgrade', 'websocket')
+        self.send_header('Connection', 'Upgrade')
+        self.send_header('Sec-WebSocket-Accept', accept)
+        self.end_headers()
+        self.connection.settimeout(30)
+        try:
+            while True:
+                payload = json.dumps({
+                    'type': 'window_end',
+                    'data': phase1_compat.device_snapshot(self.server.gateway),
+                }).encode()
+                header_bytes = bytes([0x81, len(payload)]) if len(payload) < 126 else (
+                    bytes([0x81, 126]) + struct.pack('!H', len(payload)))
+                self.wfile.write(header_bytes + payload)
+                self.wfile.flush()
+                # Drain client frames (ping/close) without blocking the poll cadence forever.
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    remaining = max(0.1, deadline - time.monotonic())
+                    self.connection.settimeout(remaining)
+                    try:
+                        opcode_byte = self.rfile.read(1)
+                    except OSError:
+                        break
+                    if not opcode_byte:
+                        return
+                    opcode = opcode_byte[0] & 0x0F
+                    length_byte = self.rfile.read(1)
+                    if not length_byte:
+                        return
+                    length = length_byte[0] & 0x7F
+                    masked = (length_byte[0] & 0x80) != 0
+                    if length == 126:
+                        length = struct.unpack('!H', self.rfile.read(2))[0]
+                    elif length == 127:
+                        length = struct.unpack('!Q', self.rfile.read(8))[0]
+                    mask = self.rfile.read(4) if masked else b''
+                    data = self.rfile.read(length) if length else b''
+                    if masked and data:
+                        data = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+                    if opcode == 0x8:  # close
+                        return
+                    if opcode == 0x9:  # ping -> pong
+                        frame = bytes([0x8A, len(data)]) + data
+                        self.wfile.write(frame)
+                        self.wfile.flush()
+        except OSError:
+            return
 
     do_GET = dispatch
     do_POST = dispatch
     do_DELETE = dispatch
-
     do_PATCH = dispatch

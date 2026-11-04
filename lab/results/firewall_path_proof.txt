@@ -1,0 +1,103 @@
+=== TrustEdge firewall path proof ===
+timestamp: 2026-11-04T13:02:46Z
+firewall LAN iface: eth0
+
+device tiers / capture: {'172.20.0.10': 'QUARANTINE', '172.20.0.11': 'QUARANTINE', '172.20.0.12': 'QUARANTINE', '172.20.0.13': 'QUARANTINE', '172.20.0.14': 'QUARANTINE'}
+capture {'error': None, 'dropped': 0}
+
+----- trustedge-lab-laptop (172.20.0.10) -----
+networks: lab_lan=172.20.0.10 
+routes:
+default via 172.20.0.2 dev eth0 
+172.20.0.0/24 dev eth0 proto kernel scope link src 172.20.0.10 
+default gateway: 172.20.0.2
+dns wan-sink: no-dns-alias
+HTTP http://172.21.0.10/ -> HTTP 000000
+firewall eth0 rx_packets delta=37
+tcpdump lines (src device ↔ WAN):
+4
+13:02:47.339843 IP 172.20.0.10.55356 > 172.21.0.10.80: Flags [S], seq 2711487556, win 64240, options [mss 1460,sackOK,TS val 1667737827 ecr 0,nop,wscale 7], length 0
+13:02:48.353709 IP 172.20.0.10.55356 > 172.21.0.10.80: Flags [S], seq 2711487556, win 64240, options [mss 1460,sackOK,TS val 1667738841 ecr 0,nop,wscale 7], length 0
+13:02:49.378546 IP 172.20.0.10.55356 > 172.21.0.10.80: Flags [S], seq 2711487556, win 64240, options [mss 1460,sackOK,TS val 1667739865 ecr 0,nop,wscale 7], length 0
+13:02:50.402979 IP 172.20.0.10.55356 > 172.21.0.10.80: Flags [S], seq 2711487556, win 64240, options [mss 1460,sackOK,TS val 1667740890 ecr 0,nop,wscale 7], length 0
+PASS: packets from 172.20.0.10 observed on firewall eth0
+
+----- trustedge-lab-iot-camera (172.20.0.11) -----
+networks: lab_lan=172.20.0.11 
+routes:
+default via 172.20.0.2 dev eth0 
+172.20.0.0/24 dev eth0 proto kernel scope link src 172.20.0.11 
+default gateway: 172.20.0.2
+dns wan-sink: no-dns-alias
+HTTP http://172.21.0.11/ping -> HTTP 000000
+firewall eth0 rx_packets delta=33
+tcpdump lines (src device ↔ WAN):
+7
+13:02:57.372252 IP 172.20.0.11.42930 > 172.21.0.11.80: Flags [S], seq 3270510093, win 64240, options [mss 1460,sackOK,TS val 3758838809 ecr 0,nop,wscale 7], length 0
+13:02:57.570668 IP 172.20.0.11.42920 > 172.21.0.11.80: Flags [S], seq 3435327189, win 64240, options [mss 1460,sackOK,TS val 3758839007 ecr 0,nop,wscale 7], length 0
+13:02:58.401758 IP 172.20.0.11.42930 > 172.21.0.11.80: Flags [S], seq 3270510093, win 64240, options [mss 1460,sackOK,TS val 3758839839 ecr 0,nop,wscale 7], length 0
+13:02:58.597494 IP 172.20.0.11.42920 > 172.21.0.11.80: Flags [S], seq 3435327189, win 64240, options [mss 1460,sackOK,TS val 3758840034 ecr 0,nop,wscale 7], length 0
+13:02:59.426033 IP 172.20.0.11.42930 > 172.21.0.11.80: Flags [S], seq 3270510093, win 64240, options [mss 1460,sackOK,TS val 3758840863 ecr 0,nop,wscale 7], length 0
+PASS: packets from 172.20.0.11 observed on firewall eth0
+
+----- trustedge-lab-iot-thermostat (172.20.0.12) -----
+networks: lab_lan=172.20.0.12 
+routes:
+default via 172.20.0.2 dev eth0 
+172.20.0.0/24 dev eth0 proto kernel scope link src 172.20.0.12 
+default gateway: 172.20.0.2
+dns wan-sink: no-dns-alias
+HTTP http://172.21.0.11/ping -> HTTP 000000
+firewall eth0 rx_packets delta=30
+tcpdump lines (src device ↔ WAN):
+9
+13:03:07.411407 IP 172.20.0.12.36572 > 172.21.0.11.80: Flags [S], seq 2210572104, win 64240, options [mss 1460,sackOK,TS val 924049776 ecr 0,nop,wscale 7], length 0
+13:03:07.554150 IP 172.20.0.12.36556 > 172.21.0.11.80: Flags [S], seq 2635290088, win 64240, options [mss 1460,sackOK,TS val 924049919 ecr 0,nop,wscale 7], length 0
+13:03:08.450698 IP 172.20.0.12.36572 > 172.21.0.11.80: Flags [S], seq 2210572104, win 64240, options [mss 1460,sackOK,TS val 924050816 ecr 0,nop,wscale 7], length 0
+13:03:08.464081 IP 172.20.0.12.36586 > 172.21.0.11.80: Flags [S], seq 2808926688, win 64240, options [mss 1460,sackOK,TS val 924050829 ecr 0,nop,wscale 7], length 0
+13:03:09.474667 IP 172.20.0.12.36572 > 172.21.0.11.80: Flags [S], seq 2210572104, win 64240, options [mss 1460,sackOK,TS val 924051839 ecr 0,nop,wscale 7], length 0
+PASS: packets from 172.20.0.12 observed on firewall eth0
+
+----- trustedge-lab-phone (172.20.0.13) -----
+networks: lab_lan=172.20.0.13 
+routes:
+default via 172.20.0.2 dev eth0 
+172.20.0.0/24 dev eth0 proto kernel scope link src 172.20.0.13 
+default gateway: 172.20.0.2
+dns wan-sink: no-dns-alias
+HTTP http://172.21.0.10/ -> HTTP 000000
+firewall eth0 rx_packets delta=34
+tcpdump lines (src device ↔ WAN):
+6
+13:03:17.457062 IP 172.20.0.13.47422 > 172.21.0.10.80: Flags [S], seq 930023744, win 64240, options [mss 1460,sackOK,TS val 923441189 ecr 0,nop,wscale 7], length 0
+13:03:18.498163 IP 172.20.0.13.47422 > 172.21.0.10.80: Flags [S], seq 930023744, win 64240, options [mss 1460,sackOK,TS val 923442230 ecr 0,nop,wscale 7], length 0
+13:03:19.522866 IP 172.20.0.13.47422 > 172.21.0.10.80: Flags [S], seq 930023744, win 64240, options [mss 1460,sackOK,TS val 923443254 ecr 0,nop,wscale 7], length 0
+13:03:20.546346 IP 172.20.0.13.47422 > 172.21.0.10.80: Flags [S], seq 930023744, win 64240, options [mss 1460,sackOK,TS val 923444278 ecr 0,nop,wscale 7], length 0
+13:03:20.718536 IP 172.20.0.13.46692 > 172.21.0.10.80: Flags [S], seq 2399352579, win 64240, options [mss 1460,sackOK,TS val 923444450 ecr 0,nop,wscale 7], length 0
+PASS: packets from 172.20.0.13 observed on firewall eth0
+
+----- trustedge-lab-printer (172.20.0.14) -----
+networks: lab_lan=172.20.0.14 
+routes:
+default via 172.20.0.2 dev eth0 
+172.20.0.0/24 dev eth0 proto kernel scope link src 172.20.0.14 
+default gateway: 172.20.0.2
+dns wan-sink: no-dns-alias
+HTTP http://172.21.0.11/ping -> HTTP 000000
+firewall eth0 rx_packets delta=40
+tcpdump lines (src device ↔ WAN):
+7
+13:03:27.549835 IP 172.20.0.14.56784 > 172.21.0.11.80: Flags [S], seq 2226386164, win 64240, options [mss 1460,sackOK,TS val 3795746940 ecr 0,nop,wscale 7], length 0
+13:03:27.716415 IP 172.20.0.14.43032 > 172.21.0.10.80: Flags [S], seq 4251728318, win 64240, options [mss 1460,sackOK,TS val 2520113765 ecr 0,nop,wscale 7], length 0
+13:03:28.610924 IP 172.20.0.14.56784 > 172.21.0.11.80: Flags [S], seq 2226386164, win 64240, options [mss 1460,sackOK,TS val 3795748002 ecr 0,nop,wscale 7], length 0
+13:03:29.638695 IP 172.20.0.14.56784 > 172.21.0.11.80: Flags [S], seq 2226386164, win 64240, options [mss 1460,sackOK,TS val 3795749029 ecr 0,nop,wscale 7], length 0
+13:03:30.625725 IP 172.20.0.14.48418 > 172.21.0.11.80: Flags [S], seq 1586881753, win 64240, options [mss 1460,sackOK,TS val 3795750016 ecr 0,nop,wscale 7], length 0
+PASS: packets from 172.20.0.14 observed on firewall eth0
+
+===== Controlled block test (thermo) =====
+thermo tier=QUARANTINE HTTP=000000 (expect 200 if TRUSTED)
+laptop tier=QUARANTINE-or-000000 HTTP=000000 (expect not 200 if QUARANTINE)
+NOTE: block contrast depends on current tiers (thermo=QUARANTINE/000000 laptop=000000)
+
+PASS=5 FAIL=0
+report: /Users/nihaarikapv/cursor/trustedge-phase2-integration/lab/results/firewall_path_proof.txt

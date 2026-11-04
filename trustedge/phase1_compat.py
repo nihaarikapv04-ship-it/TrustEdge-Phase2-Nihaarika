@@ -1,16 +1,15 @@
 """Phase 1 dashboard API compatibility wrapper over the Phase 2 gateway.
 
-Served under `/p1/*`. Cloud/RBAC/users remain stubbed; attack simulation maps to
-fixture windows in simulation mode only. The Phase 2 console at `/` is unchanged.
+Served under `/p1/*`. JWT + admin/operator/viewer roles are enforced via
+phase1_auth. Cloud telemetry is omitted. Attack simulation maps to fixture
+windows in simulation mode only. The Phase 2 console at `/` is unchanged.
 """
-import hmac
 import json
-from urllib.parse import parse_qs, urlsplit
 
-from .detection import BASELINE_WINDOWS, CONTAMINATION
+from .detection import BASELINE_WINDOWS, CONTAMINATION, DetectionError
 from .policy import PolicyError
-from .detection import DetectionError
 from .simulation import fixture
+from . import phase1_auth
 
 
 def ok(data=None, msg='ok', code=200):
@@ -69,35 +68,55 @@ def history_rows(windows):
     return rows
 
 
-def anomaly_rows(windows):
+def anomaly_rows(windows, names=None):
+    names = names or {}
     rows = []
     for window in windows:
         score = window.get('score')
         if not window.get('hard') and (score is None or score < .5):
             continue
+        layer = 'hard_rule' if window.get('hard') else (
+            'autoencoder' if window.get('ae_suppressed') else 'isolation_forest')
+        ts = window.get('timestamp')
+        ip = window.get('ip')
+        reason = window.get('reason') or ''
         rows.append({
-            'timestamp': window.get('timestamp'),
-            'device': window.get('ip'),
-            'layer': 'HARD_RULE' if window.get('hard') else 'IF',
+            'ts': ts,
+            'timestamp': ts,
+            'device': ip,
+            'name': names.get(ip, ip),
+            'layer': layer,
             'score': score,
-            'reason': window.get('reason') or '',
+            'anomaly_score': score,
+            'rule': reason,
+            'reason': reason,
             'tier': window.get('desired_tier'),
             'ae_suppressed': bool(window.get('ae_suppressed')),
         })
     return rows
 
 
-def tier_change_rows(events):
+def tier_change_rows(events, names=None):
+    names = names or {}
     rows = []
     for event in events:
         if event.get('action') != 'tier_changed':
             continue
+        ts = event.get('timestamp')
+        ip = event.get('ip')
+        trust = event.get('trust')
+        reason = event.get('reason') or event.get('detail') or ''
         rows.append({
-            'timestamp': event.get('timestamp'),
-            'device': event.get('ip'),
+            'ts': ts,
+            'timestamp': ts,
+            'device': ip,
+            'name': names.get(ip, ip),
             'old_tier': event.get('previous'),
             'new_tier': event.get('tier'),
-            'trust': event.get('trust'),
+            'trust': trust,
+            'trust_score': trust,
+            'anomaly_score': event.get('score'),
+            'reason': reason,
         })
     return rows
 
@@ -120,33 +139,72 @@ def traffic_rows(windows):
 
 
 def topology(gateway, topology_cfg):
+    """Shape matches Phase 1 `/topology`: `{nodes, edges}` for the original SVG map."""
     devices = [device_view(d) for d in gateway.storage.devices().values() if not d.get('deleting')]
-    lan = (topology_cfg or {}).get('lan', 'lan')
-    wan = (topology_cfg or {}).get('wan', 'wan')
-    return {
-        'firewall': {'lan': lan, 'wan': wan},
-        'devices': [{'ip': d['ip'], 'name': d['name'], 'tier': d['tier'], 'trust_score': d['trust_score']}
-                    for d in devices],
-        'links': [{'source': d['ip'], 'target': 'firewall', 'tier': d['tier']} for d in devices],
-    }
+    cfg = topology_cfg or {}
+    gateway_ip = cfg.get('gateway') or '172.20.0.2'
+    dns_ip = cfg.get('dns') or '172.21.0.12'
+    nodes = [{
+        'ip': d['ip'], 'name': d['name'], 'tier': d['tier'],
+        'trust_score': d['trust_score'], 'learning': d['learning'], 'type': d['type'],
+    } for d in devices]
+    # Synthetic external sinks so the Phase 1 map has a WAN side without packet-graph state.
+    externals = [
+        {'ip': gateway_ip, 'name': 'gateway', 'tier': 'EXTERNAL', 'trust_score': None,
+         'learning': False, 'type': 'external'},
+        {'ip': dns_ip, 'name': 'dns', 'tier': 'EXTERNAL', 'trust_score': None,
+         'learning': False, 'type': 'dns'},
+    ]
+    seen = {n['ip'] for n in nodes}
+    for ext in externals:
+        if ext['ip'] not in seen:
+            nodes.append(ext)
+            seen.add(ext['ip'])
+    for d in devices:
+        for dst in (gateway.storage.devices().get(d['ip'], {}) or {}).get('destinations') or []:
+            if dst not in seen:
+                nodes.append({'ip': dst, 'name': dst, 'tier': 'EXTERNAL', 'trust_score': None,
+                              'learning': False, 'type': 'external'})
+                seen.add(dst)
+    edges = []
+    for d in devices:
+        dests = (gateway.storage.devices().get(d['ip'], {}) or {}).get('destinations') or []
+        for dst in dests or [dns_ip]:
+            edges.append({'source': d['ip'], 'target': dst, 'packets': 0, 'bytes': 0, 'last_seen': None})
+    return {'nodes': nodes, 'edges': edges}
 
 
-def handle(server, method, path, query, body, authorized):
+def device_snapshot(gateway):
+    return [device_view(d) for d in gateway.storage.devices().values() if not d.get('deleting')]
+
+
+def handle(server, method, path, query, body, bearer):
     """Dispatch one Phase 1-compatible request. Returns (code, payload_dict)."""
     g = server.gateway
     parts = [p for p in path.strip('/').split('/') if p]
+    secret = phase1_auth.jwt_secret(server.token)
+    phase1_auth.ensure_seed_users(g.storage)
+
+    allowed, status, message, principal = phase1_auth.authorize(method, parts, bearer, secret)
+    if not allowed:
+        return err(message, status)
 
     if method == 'POST' and parts == ['auth', 'login']:
         username = (body.get('username') or '').strip()
         password = body.get('password') or ''
         if not username or not password:
             return err('username and password are required', 400)
-        if not hmac.compare_digest(password.encode(), server.token.encode()):
+        if g.storage.user_count() == 0:
+            return err(
+                'no Phase 1 users configured; set TRUSTEDGE_ADMIN_PASSWORD and restart',
+                503)
+        user = g.storage.get_user(username)
+        if not user or not phase1_auth.verify_password_hash(password, user['password_hash']):
             return err('Invalid username or password', 401)
-        return ok({'token': server.token, 'username': username, 'role': 'admin'},
+        token = phase1_auth.make_token(user['username'], user['role'], secret)
+        return ok({'token': token, 'username': user['username'], 'role': user['role']},
                   msg='Login successful')
 
-    # Public Phase 1 status (auth optional); still useful when logged out.
     if method == 'GET' and parts == ['status']:
         devices = [d for d in g.storage.devices().values() if not d.get('deleting')]
         return ok({
@@ -159,10 +217,14 @@ def handle(server, method, path, query, body, authorized):
             'cloud_api_url': None,
             'ready': g.status().get('ready'),
             'mode': server.mode,
+            'users_configured': g.storage.user_count() > 0,
         }, msg='TrustEdge API running')
 
-    if not authorized:
-        return err('authentication required', 401)
+    # Remaining routes require a principal (authorize already enforced JWT except public).
+    if principal is None and not (method == 'GET' and parts == ['status']):
+        # GET status is public; everything else past login must be authenticated.
+        if not (method == 'POST' and parts == ['auth', 'login']):
+            return err('authentication required', 401)
 
     try:
         if method == 'GET' and parts == ['device-types']:
@@ -176,7 +238,7 @@ def handle(server, method, path, query, body, authorized):
             ])
 
         if method == 'GET' and parts == ['devices']:
-            return ok([device_view(d) for d in g.storage.devices().values() if not d.get('deleting')])
+            return ok(device_snapshot(g))
 
         if method == 'POST' and parts == ['devices']:
             ip = (body.get('ip') or '').strip()
@@ -193,8 +255,7 @@ def handle(server, method, path, query, body, authorized):
         if len(parts) >= 2 and parts[0] == 'devices':
             ip = parts[1]
             if method == 'GET' and len(parts) == 2:
-                d = g._device(ip)
-                return ok(device_view(d))
+                return ok(device_view(g._device(ip)))
             if method == 'PATCH' and len(parts) == 2:
                 d = g._device(ip)
                 name = body.get('name', d['name'])
@@ -234,10 +295,12 @@ def handle(server, method, path, query, body, authorized):
 
         if method == 'GET' and parts == ['events', 'anomalies']:
             n = min(int((query.get('n') or ['200'])[0]), 1000)
-            return ok(anomaly_rows(g.storage.windows(limit=n))[-n:])
+            names = {ip: d.get('name', ip) for ip, d in g.storage.devices().items()}
+            return ok(anomaly_rows(g.storage.windows(limit=n), names)[-n:])
 
         if method == 'GET' and parts == ['events', 'tier-changes']:
-            return ok(tier_change_rows(g.storage.events()))
+            names = {ip: d.get('name', ip) for ip, d in g.storage.devices().items()}
+            return ok(tier_change_rows(g.storage.events(), names))
 
         if method == 'GET' and parts == ['traffic']:
             n = min(int((query.get('n') or ['500'])[0]), 2000)
@@ -247,13 +310,15 @@ def handle(server, method, path, query, body, authorized):
             return ok(topology(g, server.topology))
 
         if method == 'GET' and parts == ['audit-log']:
+            if principal and principal['role'] == 'viewer':
+                return err('Forbidden — admin or operator role required', 403)
             n = min(int((query.get('n') or ['200'])[0]), 1000)
             rows = []
             for event in g.storage.events()[:n]:
                 rows.append({
                     'ts': event.get('timestamp'),
-                    'username': 'operator',
-                    'role': 'admin',
+                    'username': (principal or {}).get('username', ''),
+                    'role': (principal or {}).get('role', ''),
                     'action': event.get('action'),
                     'target': event.get('ip', ''),
                     'detail': json.dumps({k: v for k, v in event.items()
@@ -265,13 +330,32 @@ def handle(server, method, path, query, body, authorized):
             return ok({} if parts[-1] != 'alerts' else [], msg='cloud telemetry omitted in Phase 2')
 
         if method == 'GET' and parts == ['users']:
-            return ok([{'username': 'operator', 'role': 'admin'}])
+            return ok(g.storage.list_users())
 
-        if parts[:1] == ['users']:
-            return err('per-user RBAC is not enabled; use the gateway bearer token', 501)
+        if method == 'POST' and parts == ['users']:
+            username = (body.get('username') or '').strip()
+            password = body.get('password') or ''
+            role = body.get('role', 'viewer')
+            if not g.storage.create_user(username, phase1_auth.hash_password(password), role):
+                return err(f"User '{username}' already exists", 409)
+            return ok({'username': username, 'role': role}, msg='User created', code=201)
 
-        if parts == ['ws']:
-            return err('websocket upgrades are not implemented on the compatibility API; polling continues to work', 501)
+        if method == 'DELETE' and len(parts) == 2 and parts[0] == 'users':
+            username = parts[1]
+            if username == 'admin':
+                return err('Cannot delete the default admin account', 403)
+            if not g.storage.delete_user(username):
+                return err(f"User '{username}' not found", 404)
+            return ok(msg=f"User '{username}' deleted")
+
+        if method == 'PATCH' and len(parts) == 2 and parts[0] == 'users':
+            username = parts[1]
+            role = body.get('role')
+            if not role:
+                return err('role is required', 400)
+            if not g.storage.update_user_role(username, role):
+                return err(f"User '{username}' not found", 404)
+            return ok({'username': username, 'role': role}, msg=f"User '{username}' updated")
 
         return err('unknown Phase 1 compatibility endpoint', 404)
     except DetectionError as exc:

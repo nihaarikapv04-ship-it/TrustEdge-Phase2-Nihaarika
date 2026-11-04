@@ -13,3 +13,10 @@ tmp/
 # Docker lab local state
 lab/.env
 lab/.env.token
+
+lab/.admin.password
+lab/.operator.password
+lab/.viewer.password
+
+# Local RC tarballs (keep manifests in git if desired; binaries stay local)
+deployment/raspberry-pi/rc-snapshots/*.tar.gz

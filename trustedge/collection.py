@@ -9,6 +9,14 @@ from .detection import DetectionError
 
 def packet_metadata(packet):
     from scapy.layers.inet import IP, TCP, UDP
+    from scapy.layers.l2 import Ether
+    # Some Docker/veth paths deliver ETH_P_ALL frames as unbound Raw (no Ether/IP
+    # layers). Re-dissect as Ethernet so Phase 1 feature extraction still runs.
+    if not packet.haslayer(IP):
+        try:
+            packet = Ether(bytes(packet))
+        except Exception:
+            return None
     if not packet.haslayer(IP):
         return None
     ip = packet[IP]
@@ -37,7 +45,9 @@ class LiveCollector:
     def start(self):
         from scapy.sendrecv import AsyncSniffer
         started = threading.Event()
-        self.sniffer = AsyncSniffer(iface=self.interface, filter='ip', store=False,
+        # Prefer an explicit L4 filter: bare BPF 'ip' matches nothing on some
+        # Docker Desktop / veth setups, while 'tcp or udp or icmp' captures traffic.
+        self.sniffer = AsyncSniffer(iface=self.interface, filter='tcp or udp or icmp', store=False,
                                     prn=self._packet, started_callback=started.set)
         self.sniffer.start()
         if not started.wait(5):

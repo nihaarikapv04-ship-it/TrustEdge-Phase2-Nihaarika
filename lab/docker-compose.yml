@@ -1,125 +1,212 @@
 # Local Docker Compose lab: Phase 1 device/WAN topology + Phase 2 backend.
-# Does not replace Pi deployment. Omits Phase 1 cloud telemetry, SMTP and MailHog.
+# Does not replace Pi native deployment (see deployment/raspberry-pi/).
 # WAN sink at 172.21.0.11 preserves Phase 1 device destination IPs without gateway uploads.
+#
+# Networking contract (same on Docker Desktop macOS and Linux Engine / Pi):
+#   - Two user-defined bridges with fixed subnets (lab LAN + lab WAN).
+#   - Device containers attach ONLY to lan; WAN services ONLY to wan.
+#   - Firewall attaches to BOTH and routes/NAT between them (L3 gateway).
+#   - Inter-container reachability uses stable compose DNS names AND fixed IPs.
+#   - Applications must NOT use localhost/127.0.0.1 to reach other containers.
 
 networks:
   lan:
     driver: bridge
+    enable_ipv6: false
+    # Host must NOT hairpin LAN↔WAN around the firewall container.
+    # Masquerade on the Docker bridge encourages *.1 bypass on Linux Engine.
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+      com.docker.network.bridge.enable_icc: "true"
     ipam:
+      driver: default
       config:
+        # Gateway *.1 remains the Docker bridge on the host. Device containers
+        # override default route to 172.20.0.2 (firewall) via ensure_gateway.sh.
         - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1
   wan:
     driver: bridge
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+      com.docker.network.bridge.enable_icc: "true"
     ipam:
+      driver: default
       config:
         - subnet: 172.21.0.0/24
+          gateway: 172.21.0.1
+
+x-device-env: &device-env
+  TRUSTEDGE_GATEWAY_IP: "172.20.0.2"
+  TRUSTEDGE_WEBSERVER_IP: "172.21.0.10"
+  TRUSTEDGE_SINK_IP: "172.21.0.11"
+  TRUSTEDGE_DNS_IP: "172.21.0.12"
+
+x-device-common: &device-common
+  cap_add:
+    - NET_ADMIN
+  environment:
+    <<: *device-env
+  volumes:
+    - ./containers/_common/ensure_gateway.sh:/ensure_gateway.sh:ro
+  depends_on:
+    firewall:
+      condition: service_healthy
 
 services:
   firewall:
     build:
       context: ..
       dockerfile: lab/firewall/Dockerfile
+    image: trustedge-lab-firewall:local
     container_name: trustedge-lab-firewall
+    hostname: firewall
     cap_add:
       - NET_ADMIN
       - NET_RAW
       - SYS_ADMIN
     sysctls:
       - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.forwarding=1
     networks:
       lan:
         ipv4_address: 172.20.0.2
+        aliases: [firewall, trustedge-gateway]
       wan:
         ipv4_address: 172.21.0.2
+        aliases: [firewall-wan]
     ports:
       - "8080:8080"
       - "5001:8080"
     environment:
       - TRUSTEDGE_API_TOKEN=${TRUSTEDGE_API_TOKEN:?set TRUSTEDGE_API_TOKEN to at least 24 characters}
+      - TRUSTEDGE_ADMIN_PASSWORD=${TRUSTEDGE_ADMIN_PASSWORD:?set TRUSTEDGE_ADMIN_PASSWORD (min 8 chars)}
+      - TRUSTEDGE_OPERATOR_PASSWORD=${TRUSTEDGE_OPERATOR_PASSWORD:-}
+      - TRUSTEDGE_VIEWER_PASSWORD=${TRUSTEDGE_VIEWER_PASSWORD:-}
+      - TRUSTEDGE_JWT_SECRET=${TRUSTEDGE_JWT_SECRET:-}
       - TRUSTEDGE_LAB_BIND=1
       - TRUSTEDGE_BIND=0.0.0.0
+      - TRUSTEDGE_LAN_IP=172.20.0.2
+      - TRUSTEDGE_WAN_IP=172.21.0.2
+      - TRUSTEDGE_SUBNET=172.20.0.0/24
+      - TRUSTEDGE_DNS_IP=172.21.0.12
+      # Lab-only wall-clock acceleration of real capture windows (Phase 1 default remains 60s).
+      - TRUSTEDGE_WINDOW_SECONDS=${TRUSTEDGE_WINDOW_SECONDS:-5}
     volumes:
       - lab-db:/var/lib/trustedge
+    healthcheck:
+      # /status requires auth; 401 means the API process is listening.
+      test: ["CMD-SHELL", "code=$$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/status || true); echo $$code | grep -Eq '401|200'"]
+      interval: 5s
+      timeout: 3s
+      retries: 18
+      start_period: 15s
     depends_on:
-      - webserver
-      - wan-sink
-      - dns
+      webserver:
+        condition: service_started
+      wan-sink:
+        condition: service_started
+      dns:
+        condition: service_started
 
   laptop:
+    <<: *device-common
     build: ./containers/laptop
     container_name: trustedge-lab-laptop
-    cap_add:
-      - NET_ADMIN
+    hostname: laptop
     networks:
       lan:
         ipv4_address: 172.20.0.10
-    depends_on:
-      - firewall
+        aliases: [laptop]
 
   iot-camera:
+    <<: *device-common
     build: ./containers/iot-camera
     container_name: trustedge-lab-iot-camera
-    cap_add:
-      - NET_ADMIN
+    hostname: iot-camera
     networks:
       lan:
         ipv4_address: 172.20.0.11
-    depends_on:
-      - firewall
+        aliases: [iot-camera]
 
   iot-thermostat:
+    <<: *device-common
     build: ./containers/iot-thermostat
     container_name: trustedge-lab-iot-thermostat
-    cap_add:
-      - NET_ADMIN
+    hostname: iot-thermostat
     networks:
       lan:
         ipv4_address: 172.20.0.12
-    depends_on:
-      - firewall
+        aliases: [iot-thermostat]
 
   phone:
+    <<: *device-common
     build: ./containers/phone
     container_name: trustedge-lab-phone
-    cap_add:
-      - NET_ADMIN
+    hostname: phone
     networks:
       lan:
         ipv4_address: 172.20.0.13
-    depends_on:
-      - firewall
+        aliases: [phone]
 
   printer:
+    <<: *device-common
     build: ./containers/printer
     container_name: trustedge-lab-printer
-    cap_add:
-      - NET_ADMIN
+    hostname: printer
     networks:
       lan:
         ipv4_address: 172.20.0.14
-    depends_on:
-      - firewall
+        aliases: [printer]
 
   webserver:
     build: ./containers/webserver
     container_name: trustedge-lab-webserver
+    hostname: webserver
     networks:
       wan:
         ipv4_address: 172.21.0.10
+        aliases: [webserver]
+    healthcheck:
+      # nginx:alpine has wget, not python3
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   wan-sink:
     build: ./containers/wan-sink
     container_name: trustedge-lab-wan-sink
+    hostname: wan-sink
     networks:
       wan:
         ipv4_address: 172.21.0.11
+        aliases: [wan-sink]
+    healthcheck:
+      # wan-sink serves health at /ping (GET / returns 404).
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1/ping', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   dns:
     build: ./containers/dns
     container_name: trustedge-lab-dns
+    hostname: dns
     networks:
       wan:
         ipv4_address: 172.21.0.12
+        aliases: [dns]
+    # CoreDNS image has no curl/python; TCP/53 open is enough as a readiness signal.
+    healthcheck:
+      test: ["CMD", "/coredns", "-version"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
 volumes:
   lab-db:

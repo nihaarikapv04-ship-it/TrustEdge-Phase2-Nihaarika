@@ -3848,8 +3848,10 @@
     }
 
     function connectWS() {
+      if (!_jwt) return;
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}${API}/ws`;
+      // Browsers cannot set Authorization on WebSocket; pass JWT as a query token.
+      const wsUrl = `${protocol}//${window.location.host}${API}/ws?token=${encodeURIComponent(_jwt)}`;
       const ws = new WebSocket(wsUrl);
       ws.onmessage = function(e) {
         try {

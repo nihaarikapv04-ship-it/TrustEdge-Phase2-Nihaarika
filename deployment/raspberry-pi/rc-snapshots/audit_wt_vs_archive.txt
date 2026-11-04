@@ -1,0 +1,4 @@
+wt=105 arch=105 only_wt=0 only_arch=0 changed=3
+CHANGED deployment/raspberry-pi/DEPLOYMENT_REPORT.md
+CHANGED deployment/raspberry-pi/TROUBLESHOOTING.md
+CHANGED docs/LOCAL_PARITY_REPORT.md

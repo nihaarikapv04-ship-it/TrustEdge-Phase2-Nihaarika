@@ -1,0 +1,222 @@
+[
+  {
+    "label": "win1",
+    "window": {
+      "id": 4194,
+      "timestamp": "2026-11-04 09:26:33",
+      "packets": 143,
+      "bytes": 13926,
+      "features": [
+        143.0,
+        13926.0,
+        0.6613755226135254,
+        0.00465757410291215,
+        1.0,
+        1.0,
+        1.0,
+        97.38461538461539,
+        31.94508467107703,
+        1.0,
+        0.0,
+        0.0,
+        0.03948622815099013,
+        -1.4426951595367387e-09
+      ],
+      "score": 0.8395,
+      "hard": false,
+      "reason": "ml",
+      "ae_suppressed": false,
+      "trust": 0.832,
+      "desired_tier": "TRUSTED",
+      "applied_tier": "TRUSTED",
+      "if_score": 0.8395,
+      "ae_recon_error": 76.00287569846742,
+      "ae_threshold": 0.02
+    },
+    "device": {
+      "ip": "172.20.0.13",
+      "trust": 0.832,
+      "desired_tier": "TRUSTED",
+      "applied_tier": "TRUSTED",
+      "anomaly_streak": 1,
+      "normal_streak": 0
+    },
+    "enforcement": "iifname \"eth0\" oifname \"eth1\" ip saddr 172.20.0.13 accept | iifname \"eth1\" oifname \"eth0\" ip daddr 172.20.0.13 ct state established,related accept"
+  },
+  {
+    "label": "win2",
+    "window": {
+      "id": 4197,
+      "timestamp": "2026-11-04 09:26:38",
+      "packets": 630,
+      "bytes": 61740,
+      "features": [
+        630.0,
+        61740.0,
+        4.593851327896118,
+        0.007303420235128964,
+        1.0,
+        1.0,
+        0.0,
+        98.0,
+        32.0,
+        1.0,
+        0.0,
+        0.0,
+        0.051236577392480415,
+        -1.4426951595367387e-09
+      ],
+      "score": 0.908,
+      "hard": false,
+      "reason": "ml",
+      "ae_suppressed": false,
+      "trust": 0.684,
+      "desired_tier": "TRUSTED",
+      "applied_tier": "TRUSTED",
+      "if_score": 0.908,
+      "ae_recon_error": 1087.8984354842003,
+      "ae_threshold": 0.02
+    },
+    "device": {
+      "ip": "172.20.0.13",
+      "trust": 0.684,
+      "desired_tier": "TRUSTED",
+      "applied_tier": "TRUSTED",
+      "anomaly_streak": 2,
+      "normal_streak": 0
+    },
+    "enforcement": "iifname \"eth0\" oifname \"eth1\" ip saddr 172.20.0.13 accept | iifname \"eth1\" oifname \"eth0\" ip daddr 172.20.0.13 ct state established,related accept"
+  },
+  {
+    "label": "win3",
+    "window": {
+      "id": 4199,
+      "timestamp": "2026-11-04 09:26:43",
+      "packets": 630,
+      "bytes": 61740,
+      "features": [
+        630.0,
+        61740.0,
+        4.550422668457031,
+        0.007234376261457919,
+        1.0,
+        1.0,
+        0.0,
+        98.0,
+        32.0,
+        1.0,
+        0.0,
+        0.0,
+        0.05046782001323001,
+        -1.4426951595367387e-09
+      ],
+      "score": 0.908,
+      "hard": false,
+      "reason": "ml",
+      "ae_suppressed": false,
+      "trust": 0.5656,
+      "desired_tier": "CAUTIOUS",
+      "applied_tier": "TRUSTED",
+      "if_score": 0.908,
+      "ae_recon_error": 1087.9061008347676,
+      "ae_threshold": 0.02
+    },
+    "device": {
+      "ip": "172.20.0.13",
+      "trust": 0.5656,
+      "desired_tier": "CAUTIOUS",
+      "applied_tier": "TRUSTED",
+      "anomaly_streak": 0,
+      "normal_streak": 0
+    },
+    "enforcement": "iifname \"eth0\" oifname \"eth1\" ip saddr 172.20.0.13 ip daddr 172.21.0.12 udp dport 53 limit rate 10/minute burst 5 packets accept | iifname \"eth1\" oifname \"eth0\" ip daddr 172.20.0.13 ip saddr 172.21.0.12 udp sport 53 ct state established accept | iifname \"eth0\" oifname \"eth1\" ip saddr 172.20.0.13 ip daddr 172.21.0.10 tcp dport { 80, 443 } limit rate 50/second burst 5 packets accept | iifname \"eth1\" oifname \"eth0\" ip daddr 172.20.0.13 ip saddr 172.21.0.10 tcp sport { 80, 443 } ct state established accept | iifname \"eth0\" oifname \"eth1\" ip saddr 172.20.0.13 ip daddr 172.21.0.11 tcp dport { 80, 443 } limit rate 50/second burst 5 packets accept | iifname \"eth1\" oifname \"eth0\" ip daddr 172.20.0.13 ip saddr 172.21.0.11 tcp sport { 80, 443 } ct state established accept"
+  },
+  {
+    "label": "hard",
+    "window": {
+      "id": 4204,
+      "timestamp": "2026-11-04 09:26:48",
+      "packets": 671,
+      "bytes": 37658,
+      "features": [
+        671.0,
+        37658.0,
+        4.935452699661255,
+        0.007366347312927246,
+        65.0,
+        2.0,
+        0.0,
+        56.12220566318927,
+        28.017930684553395,
+        0.23695976154992549,
+        0.7630402384500745,
+        0.0,
+        0.035504010041080454,
+        5.368189145748092
+      ],
+      "score": 1.0,
+      "hard": true,
+      "reason": "PORT_SCAN",
+      "ae_suppressed": false,
+      "trust": 0.1,
+      "desired_tier": "QUARANTINE",
+      "applied_tier": "CAUTIOUS",
+      "if_score": null,
+      "ae_recon_error": null,
+      "ae_threshold": null
+    },
+    "device": {
+      "ip": "172.20.0.13",
+      "trust": 0.1,
+      "desired_tier": "QUARANTINE",
+      "applied_tier": "QUARANTINE",
+      "anomaly_streak": 0,
+      "normal_streak": 0
+    },
+    "enforcement": "iifname \"eth0\" oifname \"eth1\" ip saddr 172.20.0.13 ip daddr 172.21.0.12 udp dport 53 accept | iifname \"eth1\" oifname \"eth0\" ip daddr 172.20.0.13 ip saddr 172.21.0.12 udp sport 53 ct state established accept | iifname \"eth0\" oifname \"eth1\" ip saddr 172.20.0.13 drop | iifname \"eth1\" oifname \"eth0\" ip daddr 172.20.0.13 drop"
+  },
+  {
+    "label": "post_clean",
+    "window": {
+      "id": 4220,
+      "timestamp": "2026-11-04 09:27:04",
+      "packets": 10,
+      "bytes": 796,
+      "features": [
+        10.0,
+        796.0,
+        4.2237842082977295,
+        0.4693093564775255,
+        1.0,
+        1.0,
+        9.0,
+        79.6,
+        16.8,
+        1.0,
+        0.0,
+        0.0,
+        0.2931352795348195,
+        -1.4426951595367387e-09
+      ],
+      "score": null,
+      "hard": false,
+      "reason": "quarantined",
+      "ae_suppressed": false,
+      "trust": 0.1,
+      "desired_tier": "QUARANTINE",
+      "applied_tier": "QUARANTINE",
+      "if_score": 0.9882,
+      "ae_recon_error": 16.631816371039537,
+      "ae_threshold": 0.02
+    },
+    "device": {
+      "ip": "172.20.0.13",
+      "trust": 0.1,
+      "desired_tier": "QUARANTINE",
+      "applied_tier": "QUARANTINE",
+      "anomaly_streak": 0,
+      "normal_streak": 0
+    },
+    "enforcement": "iifname \"eth0\" oifname \"eth1\" ip saddr 172.20.0.13 ip daddr 172.21.0.12 udp dport 53 accept | iifname \"eth1\" oifname \"eth0\" ip daddr 172.20.0.13 ip saddr 172.21.0.12 udp sport 53 ct state established accept | iifname \"eth0\" oifname \"eth1\" ip saddr 172.20.0.13 drop | iifname \"eth1\" oifname \"eth0\" ip daddr 172.20.0.13 drop"
+  }
+]

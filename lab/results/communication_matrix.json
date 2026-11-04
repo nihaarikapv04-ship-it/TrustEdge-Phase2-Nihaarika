@@ -1,0 +1,153 @@
+{
+  "generated": "2026-11-04T13:05:10Z",
+  "smoke": "28/28 prior expanded",
+  "path_proof": "5/5",
+  "rows": [
+    {
+      "path": "fw\u2192webserver",
+      "src": "firewall 172.21.0.2",
+      "dst": "172.21.0.10:80",
+      "proto": "TCP/HTTP",
+      "via_firewall_datapath": false,
+      "result": "PASS",
+      "evidence": "http=200 same WAN bridge"
+    },
+    {
+      "path": "fw\u2192wan-sink",
+      "src": "firewall 172.21.0.2",
+      "dst": "172.21.0.11:80",
+      "proto": "TCP/HTTP",
+      "via_firewall_datapath": false,
+      "result": "PASS",
+      "evidence": "http=200 same WAN bridge"
+    },
+    {
+      "path": "laptop\u2192WAN HTTP",
+      "src": "trustedge-lab-laptop 172.20.0.10",
+      "dst": "172.21.0.10:80",
+      "proto": "TCP/HTTP",
+      "via_firewall_datapath": true,
+      "gateway": "172.20.0.2",
+      "tier": "QUARANTINE",
+      "http": "000000",
+      "result": "PASS_PATH",
+      "evidence": "gw=172.20.0.2 tier=QUARANTINE http=000000 capture_on_fw_lan=yes"
+    },
+    {
+      "path": "laptop\u2192DNS",
+      "src": "172.20.0.10",
+      "dst": "172.21.0.12:53",
+      "proto": "UDP/DNS",
+      "via_firewall_datapath": true,
+      "tier": "QUARANTINE",
+      "result": "PASS",
+      "evidence": "dns_bytes=272"
+    },
+    {
+      "path": "camera\u2192WAN HTTP",
+      "src": "trustedge-lab-iot-camera 172.20.0.11",
+      "dst": "172.21.0.10:80",
+      "proto": "TCP/HTTP",
+      "via_firewall_datapath": true,
+      "gateway": "172.20.0.2",
+      "tier": "QUARANTINE",
+      "http": "000000",
+      "result": "PASS_PATH",
+      "evidence": "gw=172.20.0.2 tier=QUARANTINE http=000000 capture_on_fw_lan=yes"
+    },
+    {
+      "path": "camera\u2192DNS",
+      "src": "172.20.0.11",
+      "dst": "172.21.0.12:53",
+      "proto": "UDP/DNS",
+      "via_firewall_datapath": true,
+      "tier": "QUARANTINE",
+      "result": "PASS",
+      "evidence": "dns_bytes=272"
+    },
+    {
+      "path": "thermostat\u2192WAN HTTP",
+      "src": "trustedge-lab-iot-thermostat 172.20.0.12",
+      "dst": "172.21.0.10:80",
+      "proto": "TCP/HTTP",
+      "via_firewall_datapath": true,
+      "gateway": "172.20.0.2",
+      "tier": "QUARANTINE",
+      "http": "000000",
+      "result": "PASS_PATH",
+      "evidence": "gw=172.20.0.2 tier=QUARANTINE http=000000 capture_on_fw_lan=yes"
+    },
+    {
+      "path": "thermostat\u2192DNS",
+      "src": "172.20.0.12",
+      "dst": "172.21.0.12:53",
+      "proto": "UDP/DNS",
+      "via_firewall_datapath": true,
+      "tier": "QUARANTINE",
+      "result": "PASS",
+      "evidence": "dns_bytes=272"
+    },
+    {
+      "path": "phone\u2192WAN HTTP",
+      "src": "trustedge-lab-phone 172.20.0.13",
+      "dst": "172.21.0.10:80",
+      "proto": "TCP/HTTP",
+      "via_firewall_datapath": true,
+      "gateway": "172.20.0.2",
+      "tier": "QUARANTINE",
+      "http": "000000",
+      "result": "PASS_PATH",
+      "evidence": "gw=172.20.0.2 tier=QUARANTINE http=000000 capture_on_fw_lan=yes"
+    },
+    {
+      "path": "phone\u2192DNS",
+      "src": "172.20.0.13",
+      "dst": "172.21.0.12:53",
+      "proto": "UDP/DNS",
+      "via_firewall_datapath": true,
+      "tier": "QUARANTINE",
+      "result": "PASS",
+      "evidence": "dns_bytes=272"
+    },
+    {
+      "path": "printer\u2192WAN HTTP",
+      "src": "trustedge-lab-printer 172.20.0.14",
+      "dst": "172.21.0.10:80",
+      "proto": "TCP/HTTP",
+      "via_firewall_datapath": true,
+      "gateway": "172.20.0.2",
+      "tier": "QUARANTINE",
+      "http": "000000",
+      "result": "PASS_PATH",
+      "evidence": "gw=172.20.0.2 tier=QUARANTINE http=000000 capture_on_fw_lan=yes"
+    },
+    {
+      "path": "printer\u2192DNS",
+      "src": "172.20.0.14",
+      "dst": "172.21.0.12:53",
+      "proto": "UDP/DNS",
+      "via_firewall_datapath": true,
+      "tier": "QUARANTINE",
+      "result": "PASS",
+      "evidence": "dns_bytes=272"
+    },
+    {
+      "path": "isolation Q laptop vs CAUTIOUS/TRUSTED thermo",
+      "src": "laptop vs thermo",
+      "dst": ":80",
+      "proto": "TCP/HTTP",
+      "via_firewall_datapath": true,
+      "result": "PASS",
+      "evidence": "laptop http=000 thermo http=200 DNS both OK"
+    },
+    {
+      "path": "localhost negative",
+      "src": "laptop",
+      "dst": "127.0.0.1:80",
+      "proto": "TCP/HTTP",
+      "via_firewall_datapath": false,
+      "result": "FAIL_AS_DESIGNED",
+      "evidence": "not a peer path"
+    }
+  ]
+}

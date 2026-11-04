@@ -25,25 +25,16 @@ if [[ -z "$LAN_IF" || -z "$WAN_IF" || "$LAN_IF" == "$WAN_IF" ]]; then
 fi
 echo "[lab-firewall] LAN=${LAN_IF} WAN=${WAN_IF}"
 
-echo "[lab-firewall] Installing lab management allow (API port; survives policy replace)..."
-# Priority -20 accepts dashboard/API before the Phase 2 input drop at -10.
-# Required for Docker published ports; Pi keeps loopback-only access and does not use this table.
-nft delete table inet trustedge_lab_mgmt 2>/dev/null || true
-nft -f - <<EOF
-table inet trustedge_lab_mgmt {
-  chain input {
-    type filter hook input priority -20; policy accept;
-    tcp dport ${PORT} accept
-  }
-}
-EOF
-
 echo "[lab-firewall] Installing bootstrap deny rules before forwarding..."
+# tcp dport API accept must live in this same input chain (before LAN drop).
+# A separate table's accept does not override a later drop in inet trustedge.
+nft delete table inet trustedge_lab_mgmt 2>/dev/null || true
 nft delete table inet trustedge 2>/dev/null || true
 nft -f - <<EOF
 table inet trustedge {
   chain input {
     type filter hook input priority -10; policy accept;
+    tcp dport ${PORT} accept
     iifname "${LAN_IF}" meta nfproto ipv6 drop
     iifname "${LAN_IF}" drop
   }
@@ -71,6 +62,11 @@ EOF
 
 # Compose already sets net.ipv4.ip_forward=1; /proc write is often read-only in containers.
 echo 1 > /proc/sys/net/ipv4/ip_forward 2>/dev/null || true
+# Loose rp_filter so forwarded LAN→WAN replies are not dropped asymmetrically.
+for f in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 0 > "$f" 2>/dev/null || true; done
+# Answer ARP for our LAN IP as the device default gateway.
+echo 1 > "/proc/sys/net/ipv4/conf/${LAN_IF}/proxy_arp" 2>/dev/null || true
+echo 1 > /proc/sys/net/ipv4/conf/all/forwarding 2>/dev/null || true
 
 echo "[lab-firewall] Starting Phase 2 gateway (live capture on ${LAN_IF})..."
 exec python -m trustedge \

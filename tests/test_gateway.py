@@ -200,12 +200,21 @@ class PolicyTests(unittest.TestCase):
         self.assertLess(script.index('udp dport 53'), script.index(f'ip saddr {IP} drop'))
         cautious = policy.render({IP: {'desired_tier': 'CAUTIOUS', 'destinations': ['192.0.2.10']}})
         self.assertIn('ip daddr 192.0.2.10 tcp dport { 80, 443 } limit rate', cautious)
+        self.assertIn('udp dport 53 limit rate 10/minute accept', cautious)
         self.assertNotIn('flush ruleset', script)
-        self.assertIn('iifname "eth1" drop', policy.render({}))
+        quarantine = policy.render({IP: {'desired_tier': 'QUARANTINE', 'destinations': []}})
+        forward = quarantine.split('chain forward', 1)[1]
+        self.assertIn(f'ip saddr {IP} ip daddr 192.168.50.1 udp dport 53 accept', forward)
+        self.assertNotIn(f'ip saddr {IP} ip daddr 192.168.50.1 udp dport 53 limit rate', forward)
+        empty = policy.render({})
+        self.assertIn('iifname "eth1" drop', empty)
+        self.assertLess(empty.index('tcp dport 8080 accept'), empty.index('iifname "eth1" drop'))
 
     def test_invalid_policy_inputs_rejected(self):
         with self.assertRaises(ValueError):
             NftPolicy('eth1;reboot', '192.168.50.0/24', '192.168.50.1')
+        with self.assertRaises(ValueError):
+            NftPolicy('eth1', '192.168.50.0/24', '192.168.50.1', api_port=0)
 
     def test_capture_metadata_has_phase1_fields(self):
         from scapy.layers.l2 import Ether
@@ -218,6 +227,10 @@ class PolicyTests(unittest.TestCase):
         self.assertIsNotNone(packet.timestamp)
         self.assertEqual(packet.tcp_flags, 'SA')
         self.assertIsNone(packet_metadata(Ether(src='02:00:00:00:00:02', dst='02:00:00:00:00:01')))
+        from scapy.packet import Raw
+        unbound = Raw(bytes(raw))
+        rebound = packet_metadata(unbound)
+        self.assertEqual((rebound.src, rebound.dst, rebound.port), (IP, '192.0.2.10', 443))
 
 if __name__ == '__main__':
     unittest.main()

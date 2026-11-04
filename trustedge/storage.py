@@ -19,6 +19,12 @@ class Storage:
             ts TEXT DEFAULT CURRENT_TIMESTAMP, detail TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS windows_ip_id ON windows(ip,id);
         CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, ts TEXT DEFAULT CURRENT_TIMESTAMP, detail TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('admin','operator','viewer')),
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         """)
         existing = self.db.execute("SELECT value FROM metadata WHERE key='mode'").fetchone()
         if existing and existing[0] != mode:
@@ -69,6 +75,48 @@ class Storage:
         where, params = ('WHERE ip=?', [ip]) if ip else ('', [])
         rows = self.db.execute(f'SELECT id,ip,ts,detail FROM windows {where} ORDER BY id DESC LIMIT ?', params+[limit])
         return [dict(id=i,ip=address,timestamp=ts,**json.loads(detail)) for i,address,ts,detail in rows]
+
+    def user_count(self):
+        return self.db.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+
+    def list_users(self):
+        return [{'username': u, 'role': r, 'created_at': c}
+                for u, r, c in self.db.execute(
+                    'SELECT username, role, created_at FROM users ORDER BY username')]
+
+    def get_user(self, username):
+        row = self.db.execute(
+            'SELECT username, password_hash, role, created_at FROM users WHERE username=?',
+            (username,)).fetchone()
+        if not row:
+            return None
+        return {'username': row[0], 'password_hash': row[1], 'role': row[2], 'created_at': row[3]}
+
+    def create_user(self, username, password_hash, role):
+        if role not in ('admin', 'operator', 'viewer'):
+            raise ValueError('role must be admin, operator, or viewer')
+        if not isinstance(username, str) or not username or len(username) > 64:
+            raise ValueError('invalid username')
+        try:
+            with self.transaction():
+                self.db.execute(
+                    'INSERT INTO users(username, password_hash, role) VALUES (?,?,?)',
+                    (username, password_hash, role))
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def delete_user(self, username):
+        with self.transaction():
+            cur = self.db.execute('DELETE FROM users WHERE username=?', (username,))
+        return cur.rowcount > 0
+
+    def update_user_role(self, username, role):
+        if role not in ('admin', 'operator', 'viewer'):
+            raise ValueError('role must be admin, operator, or viewer')
+        with self.transaction():
+            cur = self.db.execute('UPDATE users SET role=? WHERE username=?', (role, username))
+        return cur.rowcount > 0
 
     def close(self):
         self.db.close()

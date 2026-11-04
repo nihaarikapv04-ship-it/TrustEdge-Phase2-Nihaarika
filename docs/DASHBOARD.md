@@ -4,7 +4,7 @@ The dashboard is bundled with the Python gateway and served at `http://127.0.0.1
 
 ## Phase 1 dashboard (compatibility UI)
 
-The original Phase 1 HTML dashboard is served at `http://127.0.0.1:8080/phase1` with a compatibility API under `/p1/*`. Sign in with any username and the gateway bearer token as the password. The Phase 2 local console remains at `/`. Cloud telemetry, WebSocket push, and per-user RBAC are stubbed or omitted; core device/status/history/topology/lift/rebaseline/attack-in-simulation paths are mapped to the Phase 2 gateway.
+The original Phase 1 HTML dashboard is served at `http://127.0.0.1:8080/phase1` with a compatibility API under `/p1/*`. Sign in with seeded Phase 1 JWT users (`admin` / `operator` / `viewer`) using passwords from the environment (`TRUSTEDGE_ADMIN_PASSWORD`, and optionally `TRUSTEDGE_OPERATOR_PASSWORD` / `TRUSTEDGE_VIEWER_PASSWORD`). Do not use the gateway bearer token as a Phase 1 UI password. The Phase 2 local console remains at `/` and still uses `TRUSTEDGE_API_TOKEN`. WebSocket updates on `/p1` require the JWT as `?token=`.
 
 ## Simplest launch — no token copying
 

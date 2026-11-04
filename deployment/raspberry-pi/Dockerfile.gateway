@@ -1,0 +1,25 @@
+# Multi-arch gateway image (linux/amd64 + linux/arm64) for lab / optional
+# containerized gateway experiments. Production Pi path remains native systemd.
+# Build:
+#   docker buildx build --platform linux/arm64,linux/amd64 \
+#     -f deployment/raspberry-pi/Dockerfile.gateway -t trustedge-gateway:local .
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nftables \
+    iproute2 \
+    libpcap0.8 \
+    tcpdump \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/trustedge
+COPY pyproject.toml README.md ./
+COPY trustedge ./trustedge
+RUN pip install --no-cache-dir .
+
+ENV PYTHONUNBUFFERED=1 \
+    TRUSTEDGE_BIND=127.0.0.1
+
+EXPOSE 8080
+CMD ["python", "-m", "trustedge", "--help"]

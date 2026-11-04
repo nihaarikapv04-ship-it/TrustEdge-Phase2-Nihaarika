@@ -12,7 +12,10 @@ security/orchestration corrections. They are not silent deviations.
 | Quarantine recovery | Ten normal windows can raise tier | No automatic recovery; audited `POST /devices/<ip>/release` only | Restricted traffic must not “look healthy” and self-release |
 | Learning → TRUSTED | Possible once trust recovers | Learning devices capped at `CAUTIOUS` until baseline completes | Baseline must finish before broad access |
 | Enforcement backend | `iptables` FORWARD rules | Atomic owned `nftables` table with checked return codes | Safer replacement/rollback on Pi |
+| CAUTIOUS / QUARANTINE DNS | CAUTIOUS: UDP/53 `@10/min`; QUARANTINE: UDP/53 unlimited | Same rates in nftables (`10/minute` / unlimited) | Restored Phase 1 DNS enforcement (was briefly `10/second`) |
+| CAUTIOUS HTTP(S) scope | Any destination :80/:443 | Only enrolled `destinations` :80/:443 | Explicit allow-list of known sinks |
 | Unknown/deleted devices | Rules flushed; default FORWARD historically permissive in lab | Explicit deny for unknown LAN sources | Zero-trust default |
+| Baseline windows | `BASELINE_WINDOWS = 50` | Same (`50`) | Keep Phase 1 parity (not 60) |
 
 Automated parity coverage: `tests/test_phase1_policy.py` (hard-rule quarantine,
 CAUTIOUS/QUARANTINE gates, enrollment starting state, recovery/release).

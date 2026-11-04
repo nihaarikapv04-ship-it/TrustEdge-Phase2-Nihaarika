@@ -1,0 +1,47 @@
+# Optional: run the *lab* topology on a Raspberry Pi (Linux Docker Engine).
+# This is NOT the production physical eth0/eth1 gateway mode.
+# Production uses native systemd + nft on the host (see README.md).
+#
+# Root cause this file addresses vs a naive copy of desktop Compose:
+#   1. Explicit named bridges + fixed subnets (avoid anonymous network splits).
+#   2. Firewall on BOTH lan and wan with ip_forward sysctls.
+#   3. Devices wait for firewall health (API up) before starting.
+#   4. Service DNS aliases for every container.
+#   5. Env-based gateway/sink IPs (no reliance on Mac Docker Desktop magic).
+#
+# Usage on Pi (after copying the repo):
+#   cd lab
+#   cp ../deployment/raspberry-pi/.env.example .env   # fill tokens
+#   docker compose -f docker-compose.yml -f ../deployment/raspberry-pi/docker-compose.lab-on-pi.yml up -d --build
+
+services:
+  firewall:
+    # Prefer platform tag when building on Pi or via buildx
+    platform: linux/arm64
+    mem_limit: 768m
+    cpus: 1.5
+
+  laptop:
+    platform: linux/arm64
+    mem_limit: 128m
+  iot-camera:
+    platform: linux/arm64
+    mem_limit: 128m
+  iot-thermostat:
+    platform: linux/arm64
+    mem_limit: 128m
+  phone:
+    platform: linux/arm64
+    mem_limit: 128m
+  printer:
+    platform: linux/arm64
+    mem_limit: 128m
+  webserver:
+    platform: linux/arm64
+    mem_limit: 128m
+  wan-sink:
+    platform: linux/arm64
+    mem_limit: 128m
+  dns:
+    platform: linux/arm64
+    mem_limit: 64m

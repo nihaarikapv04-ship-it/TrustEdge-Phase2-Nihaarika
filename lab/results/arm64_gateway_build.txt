@@ -1,0 +1,47 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.gateway
+#1 transferring dockerfile: 778B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.11-slim
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/6] FROM docker.io/library/python:3.11-slim@sha256:db20d8506e2f15b6db39b40b6015ca46bae855dec6dd326d462cfe79ae972893
+#4 resolve docker.io/library/python:3.11-slim@sha256:db20d8506e2f15b6db39b40b6015ca46bae855dec6dd326d462cfe79ae972893 done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 2.45kB done
+#5 DONE 0.0s
+
+#6 [4/6] COPY pyproject.toml README.md ./
+#6 CACHED
+
+#7 [5/6] COPY trustedge ./trustedge
+#7 CACHED
+
+#8 [3/6] WORKDIR /opt/trustedge
+#8 CACHED
+
+#9 [2/6] RUN apt-get update && apt-get install -y --no-install-recommends     nftables     iproute2     libpcap0.8     tcpdump     curl     && rm -rf /var/lib/apt/lists/*
+#9 CACHED
+
+#10 [6/6] RUN pip install --no-cache-dir .
+#10 CACHED
+
+#11 exporting to image
+#11 exporting layers done
+#11 exporting manifest sha256:e60e598995dc94613df72363b06c84f403ecbcad200541b0b03b8526409b1730 done
+#11 exporting config sha256:d0fa80c560944385aa3e73fa951f638263ffb4368e9893513a08dbebcea066c3 done
+#11 exporting attestation manifest sha256:e0bdffad2aa0e5fbb5ce0d2f95457f15f55b9391f948b7ff70195c854a1b535f done
+#11 exporting manifest list sha256:cbb6d39b710d70675064b648b4e46716f7fecd00a7fc7551f3877fb8758a3a9f
+#11 exporting manifest list sha256:cbb6d39b710d70675064b648b4e46716f7fecd00a7fc7551f3877fb8758a3a9f done
+#11 naming to docker.io/library/trustedge-gateway:arm64-local done
+#11 unpacking to docker.io/library/trustedge-gateway:arm64-local done
+#11 DONE 0.0s
+BASELINE 50 ok

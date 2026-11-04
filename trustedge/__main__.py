@@ -46,12 +46,27 @@ def main():
         parser.error('live mode requires --lan, --subnet and --dns')
     # Restrict newly created database/WAL files to the service account.
     os.umask(0o077)
-    policy = NftPolicy(args.lan, args.subnet, args.dns, wan=args.wan) if args.mode == 'live' else SimulationPolicy()
+    policy = (NftPolicy(args.lan, args.subnet, args.dns, wan=args.wan, api_port=args.port)
+              if args.mode == 'live' else SimulationPolicy())
     storage = Storage(args.database, args.mode)
     gateway = Gateway(storage, policy)
     # Never begin capture or expose a ready service until startup policy is installed.
     gateway.reconcile()
-    collector = LiveCollector(gateway, args.lan) if args.mode == 'live' else None
+    # Phase 1 default is 60s windows. Lab may set TRUSTEDGE_WINDOW_SECONDS to accelerate
+    # real packet-capture baseline collection without fabricating feature vectors.
+    window_seconds = 60
+    raw_window = os.environ.get('TRUSTEDGE_WINDOW_SECONDS', '').strip()
+    if raw_window:
+        try:
+            window_seconds = int(raw_window)
+        except ValueError:
+            parser.error('TRUSTEDGE_WINDOW_SECONDS must be an integer')
+        if not 1 <= window_seconds <= 600:
+            parser.error('TRUSTEDGE_WINDOW_SECONDS must be between 1 and 600')
+        if not lab_bind and window_seconds != 60:
+            parser.error('non-default TRUSTEDGE_WINDOW_SECONDS requires TRUSTEDGE_LAB_BIND=1')
+    collector = (LiveCollector(gateway, args.lan, seconds=window_seconds)
+                 if args.mode == 'live' else None)
     server = LocalServer((bind, args.port), gateway, token, args.mode, collector, topology,
                          allow_non_loopback=lab_bind)
     stop = threading.Event()

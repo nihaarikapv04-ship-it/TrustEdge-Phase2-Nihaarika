@@ -84,12 +84,23 @@ def main():
             seed_demo(gateway)
         gateway.reconcile()
         token, code = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+        # Phase 1 UI (/phase1) uses JWT users. Seed admin only for this simulation process
+        # when no password was provided via the environment; never write the password to disk.
+        admin_password = os.environ.get('TRUSTEDGE_ADMIN_PASSWORD', '').strip()
+        seeded_ephemeral = False
+        if not admin_password:
+            admin_password = secrets.token_urlsafe(12)
+            os.environ['TRUSTEDGE_ADMIN_PASSWORD'] = admin_password
+            seeded_ephemeral = True
         server = LocalServer(('127.0.0.1',args.port),gateway,token,'simulation',pairing_code=code)
         worker = threading.Thread(target=server.serve_forever,daemon=True)
         worker.start()
         url = f'http://127.0.0.1:{server.server_port}/#pair={code}'
+        phase1 = f'http://127.0.0.1:{server.server_port}/phase1'
         print('Opening the local simulation dashboard. Automatic sign-in is enabled.',flush=True)
         print('Keep this window open. Press Ctrl+C to stop. No hardware or real firewall is used.',flush=True)
+        print(f'Phase 1 UI: {phase1}',flush=True)
+        print(f'Phase 1 login: admin / {"(from TRUSTEDGE_ADMIN_PASSWORD)" if not seeded_ephemeral else admin_password}',flush=True)
         if not webbrowser.open(url):
             print('Browser could not open automatically. Open this single-use local link within two minutes:',flush=True)
             print(url,flush=True)
