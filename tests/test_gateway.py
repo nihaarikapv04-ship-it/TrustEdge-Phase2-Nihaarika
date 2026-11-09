@@ -94,6 +94,57 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(self.state()['baseline'], [])
         self.assertEqual(self.state()['desired_tier'], 'QUARANTINE')
 
+    def test_rebaseline_clears_stale_learning_timestamps_for_fresh_session(self):
+        import time
+        # Complete an initial baseline so durable timestamps and session metadata exist.
+        for _ in range(BASELINE_WINDOWS):
+            self.g.window(IP, fixture(IP, vary=True), 60)
+        d = self.state()
+        self.assertFalse(d['learning'])
+        stale_started = d.get('learning_started_at')
+        stale_completed = d.get('learning_completed_at')
+        stale_session = self.store.get_meta('learning_session_started_at')
+        self.assertTrue(stale_started)
+        self.assertTrue(stale_completed)
+        self.assertTrue(stale_session)
+        self.assertTrue(self.store.get_meta('baseline_complete_at'))
+        # Enrollment / history must remain after rebaseline.
+        windows_before = len(self.store.windows(IP, 1000))
+        self.assertGreater(windows_before, 0)
+
+        self.g.rebaseline(IP)
+        d = self.state()
+        self.assertTrue(d['learning'])
+        self.assertEqual(d['baseline'], [])
+        self.assertIsNone(d.get('learning_started_at'))
+        self.assertIsNone(d.get('learning_completed_at'))
+        self.assertIsNone(self.store.get_meta('learning_session_started_at'))
+        self.assertIsNone(self.store.get_meta('baseline_complete_at'))
+        self.assertFalse(self.store.has_model(IP))
+        self.assertEqual(d['name'], 'camera')
+        self.assertGreaterEqual(len(self.store.windows(IP, 1000)), windows_before)
+
+        # Second-resolution clocks: wait so the fresh session cannot collide with stale stamps.
+        time.sleep(1.1)
+        # Fresh learning run records new timestamps (device is CAUTIOUS, not quarantined).
+        self.g.window(IP, fixture(IP, vary=True), 60)
+        d = self.state()
+        self.assertTrue(d.get('learning_started_at'))
+        self.assertNotEqual(d['learning_started_at'], stale_started)
+        self.assertTrue(self.store.get_meta('learning_session_started_at'))
+        self.assertNotEqual(self.store.get_meta('learning_session_started_at'), stale_session)
+        self.assertEqual(len(d['baseline']), 1)
+        self.assertIsNone(d.get('learning_completed_at'))
+
+        for _ in range(BASELINE_WINDOWS - 1):
+            self.g.window(IP, fixture(IP, vary=True), 60)
+        d = self.state()
+        self.assertFalse(d['learning'])
+        self.assertTrue(d.get('learning_completed_at'))
+        self.assertNotEqual(d['learning_completed_at'], stale_completed)
+        self.assertTrue(self.store.get_meta('baseline_complete_at'))
+        self.assertTrue(self.store.has_model(IP))
+
     def test_baseline_and_streak_survive_restart(self):
         for _ in range(BASELINE_WINDOWS):
             self.g.window(IP, fixture(IP), 60)
@@ -189,10 +240,12 @@ class PolicyTests(unittest.TestCase):
             calls.append((args, kwargs))
             return subprocess.CompletedProcess(args, 0, '', '')
         policy = NftPolicy('eth1', '192.168.50.0/24', '192.168.50.1', runner)
-        policy.apply({IP: {'desired_tier': 'QUARANTINE', 'destinations': []}})
-        self.assertEqual(len(calls), 1)
+        result = policy.apply({IP: {'desired_tier': 'QUARANTINE', 'destinations': []}})
+        self.assertEqual(len(calls), 2)  # atomic apply + read-back verify
         args, options = calls[0]
         self.assertEqual(args, ['nft', '-f', '-'])
+        self.assertEqual(calls[1][0][:4], ['nft', '-j', 'list', 'table'])
+        self.assertTrue(result['verified'])
         script = options['input']
         self.assertTrue(script.startswith('add table inet trustedge\ndelete table inet trustedge\n'))
         self.assertIn('meta nfproto ipv6 drop', script)

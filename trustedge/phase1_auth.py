@@ -21,7 +21,7 @@ PUBLIC = {('POST', 'auth/login'), ('GET', 'status')}
 # Authenticated GETs any role may call.
 VIEWER_GET_PREFIXES = (
     'devices', 'device-types', 'attack-types', 'events', 'traffic', 'topology',
-    'cloud', 'status', 'ws',
+    'cloud', 'status', 'ws', 'network-load', 'learning-status', 'auth',
 )
 
 
@@ -135,6 +135,9 @@ def authorize(method: str, path_parts: list, bearer: str | None, secret: str):
     if payload is None:
         return False, 401, 'Invalid or expired token', None
     principal = {'username': payload['sub'], 'role': payload['role']}
+    # Any authenticated role may refresh its own session token.
+    if method == 'POST' and path_parts == ['auth', 'refresh']:
+        return True, 200, '', principal
     if method in MUTATING and principal['role'] not in ('admin', 'operator'):
         return False, 403, 'Forbidden — admin or operator role required', principal
     if path_parts[:1] == ['users'] and principal['role'] != 'admin':

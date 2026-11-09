@@ -1,4 +1,11 @@
 . {
+    hosts {
+        172.21.0.10 webserver.lab webserver
+        172.21.0.11 wan-sink.lab sink cloudapi
+        172.21.0.12 dns.lab dns
+        172.20.0.2 firewall.lab firewall
+        fallthrough
+    }
     forward . 8.8.8.8 8.8.4.4
     cache 30
     log

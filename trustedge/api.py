@@ -33,6 +33,8 @@ class LocalServer(ThreadingMixIn, HTTPServer):
         self.pairing_code = pairing_code
         self.pairing_deadline = time.monotonic() + 120
         self.topology = topology
+        # Phase 1 dashboard attack-sim toggles (ip → {type, started_at}); not a second engine.
+        self.attack_simulations = {}
         phase1_auth.ensure_seed_users(gateway.storage)
         super().__init__(address, Handler)
 
@@ -52,12 +54,18 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def static_asset(self, path):
-        assets = {'/': ('index.html', 'text/html; charset=utf-8'),
-                  '/dashboard.css': ('dashboard.css', 'text/css; charset=utf-8'),
-                  '/dashboard.js': ('dashboard.js', 'text/javascript; charset=utf-8'),
+        # Phase 1 original dashboard is the default UI at /. Phase 2 console stays at /v2.
+        # Vendor assets are self-hosted (no CDN / Google Fonts) for local-only Pi operation.
+        assets = {'/': ('phase1.html', 'text/html; charset=utf-8'),
                   '/phase1': ('phase1.html', 'text/html; charset=utf-8'),
                   '/phase1/': ('phase1.html', 'text/html; charset=utf-8'),
-                  '/phase1/dashboard': ('phase1.html', 'text/html; charset=utf-8')}
+                  '/phase1/dashboard': ('phase1.html', 'text/html; charset=utf-8'),
+                  '/v2': ('index.html', 'text/html; charset=utf-8'),
+                  '/v2/': ('index.html', 'text/html; charset=utf-8'),
+                  '/dashboard.css': ('dashboard.css', 'text/css; charset=utf-8'),
+                  '/dashboard.js': ('dashboard.js', 'text/javascript; charset=utf-8'),
+                  '/vendor/chart.umd.min.js': ('vendor/chart.umd.min.js',
+                                              'text/javascript; charset=utf-8')}
         if path not in assets:
             return False
         name, content_type = assets[path]
@@ -65,16 +73,17 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-Type', content_type)
         self.send_header('Content-Length', str(len(data)))
-        self.send_header('Cache-Control', 'no-store')
+        # Vendor JS may be cached; HTML stays no-store so operators always get UI fixes.
+        cache = 'public, max-age=86400' if name.startswith('vendor/') else 'no-store'
+        self.send_header('Cache-Control', cache)
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'DENY')
         self.send_header('Referrer-Policy', 'no-referrer')
-        # Phase 1 UI still loads Chart.js / fonts from CDN; Phase 2 console stays self-hosted.
         if name == 'phase1.html':
             csp = ("default-src 'self'; "
-                   "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-                   "font-src 'self' https://fonts.gstatic.com data:; "
+                   "script-src 'self' 'unsafe-inline'; "
+                   "style-src 'self' 'unsafe-inline'; "
+                   "font-src 'self' data:; "
                    "connect-src 'self' ws: wss:; img-src 'self' data:; "
                    "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         else:
@@ -105,8 +114,14 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(200, {'token': self.server.token})
 
     def dispatch(self):
-        self.connection.settimeout(5)
         url = urlsplit(self.path)
+        # Phase 1 dashboard polls several endpoints concurrently and may wait briefly
+        # on the gateway lock. A 5s socket timeout aborted valid in-flight replies and
+        # surfaced as intermittent "API unreachable" in the browser.
+        if url.path in ('/p1/ws', '/p1/ws/') or url.path.startswith('/p1'):
+            self.connection.settimeout(60)
+        else:
+            self.connection.settimeout(15)
         if self.command == 'GET' and self.static_asset(url.path):
             return
         if self.command == 'POST' and url.path == '/session/pair':
@@ -233,7 +248,7 @@ class Handler(BaseHTTPRequestHandler):
             while True:
                 payload = json.dumps({
                     'type': 'window_end',
-                    'data': phase1_compat.device_snapshot(self.server.gateway),
+                    'data': phase1_compat.device_snapshot(self.server.gateway, self.server),
                 }).encode()
                 header_bytes = bytes([0x81, len(payload)]) if len(payload) < 126 else (
                     bytes([0x81, 126]) + struct.pack('!H', len(payload)))

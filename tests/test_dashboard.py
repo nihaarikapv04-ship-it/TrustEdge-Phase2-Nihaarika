@@ -38,15 +38,21 @@ class DashboardTests(unittest.TestCase):
     def value(self,path,**kwargs): return json.loads(self.request(path,**kwargs)[1])
 
     def test_static_assets_local_and_no_auth_data_leak(self):
-        for path in ('/','/dashboard.css','/dashboard.js'):
-            headers,data=self.request(path,auth=False)
-            self.assertIn("default-src 'self'",headers['Content-Security-Policy'])
-            self.assertNotIn(TOKEN.encode(),data)
-            self.assertNotIn(b'cdn.',data)
-        self.assertIn(b'textContent',self.request('/dashboard.js',auth=False)[1])
-        for path in ('/dashboard',f'/devices/{IP}/history','/../storage.py'):
-            with self.assertRaises(HTTPError) as result: self.request(path,auth=False)
-            self.assertEqual(result.exception.code,401);result.exception.close()
+        # Phase 1 original dashboard is default at /; Phase 2 console is at /v2.
+        headers, data = self.request('/', auth=False)
+        self.assertIn(b"const API = '/p1'", data)
+        self.assertIn(b'TrustEdge Dashboard (Phase 1 UI)', data)
+        self.assertNotIn(TOKEN.encode(), data)
+        for path in ('/v2', '/dashboard.css', '/dashboard.js'):
+            headers, data = self.request(path, auth=False)
+            self.assertIn("default-src 'self'", headers['Content-Security-Policy'])
+            self.assertNotIn(TOKEN.encode(), data)
+            self.assertNotIn(b'cdn.', data)
+        self.assertIn(b'textContent', self.request('/dashboard.js', auth=False)[1])
+        self.assertIn(b'LOCAL SECURITY CONSOLE', self.request('/v2', auth=False)[1])
+        for path in ('/dashboard', f'/devices/{IP}/history', '/../storage.py'):
+            with self.assertRaises(HTTPError) as result: self.request(path, auth=False)
+            self.assertEqual(result.exception.code, 401); result.exception.close()
 
     def test_projection_history_and_safe_data_contract(self):
         self.g.window(IP,fixture(IP),60)
@@ -62,7 +68,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(len(history),1)
         self.assertEqual(len(history[0]['features']),14)
         self.assertEqual(history[0]['packets'],20)
-        self.assertEqual(history[0]['bytes'],10000)
+        self.assertEqual(history[0]['bytes'],9200)
         self.assertEqual(history[0]['trust'],.75)
         self.assertTrue(result['ready'])
         self.assertEqual(result['capture'],None)

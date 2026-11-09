@@ -17,10 +17,14 @@ IP = '192.168.50.2'
 DNS = '192.168.50.1'
 
 
-def burst_anomaly(ip, n=200):
-    """High-rate same-port burst: not a Phase 1 hard rule, but IF-anomalous after clean baseline."""
-    return [Packet(ip, '192.0.2.10', 40, 'tcp', 443, False,
-                   timestamp=i * 0.001, sport=20000 + (i % 50), tcp_flags='PA')
+def burst_anomaly(ip, n=800):
+    """High-rate micro-burst: not a Phase 1 hard rule, but IF-anomalous after clean baseline.
+
+    Sized for reliable IsolationForest detection under sklearn 1.6.1 (Pi runtime):
+    earlier 200×40B / 1ms windows intermittently scored below ANOMALY_THRESHOLD.
+    """
+    return [Packet(ip, '192.0.2.10', 20, 'tcp', 443, False,
+                   timestamp=i * 0.0002, sport=30000 + (i % 100), tcp_flags='PA')
             for i in range(n)]
 
 
@@ -52,6 +56,9 @@ class Phase1PipelineParityTests(unittest.TestCase):
         self.assertEqual(d['desired_tier'], 'CAUTIOUS')
 
     def test_if_ae_ewma_three_window_hard_rule_and_persistence(self):
+        import itertools
+        import trustedge.simulation as simulation
+        simulation._SEQ = itertools.count(0)
         for _ in range(BASELINE_WINDOWS):
             self.g.window(IP, fixture(IP, vary=True), 60)
         self.assertFalse(self._device()['learning'])

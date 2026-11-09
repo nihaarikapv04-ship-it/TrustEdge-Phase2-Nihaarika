@@ -6,8 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TrustEdge Dashboard (Phase 1 UI)</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23534AB7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s-8-4-8-10V5l8-3 8 3v7c0 6-8 10-8 10z'/></svg>">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Local-only assets: no Google Fonts / jsDelivr CDN (Phase A telemetry hardening). -->
+  <script src="/vendor/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #0f1117;
@@ -37,7 +37,7 @@
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 14px
     }
 
@@ -1527,6 +1527,28 @@
       <!-- ─── PAGE 1: OVERVIEW ─────────────────────── -->
       <div class="page active" id="page-overview">
         <div class="summary-hero" id="summary-hero"></div>
+        <div class="card mb-16" id="baseline-learning-card">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+            <span>Baseline Learning</span>
+            <span id="baseline-learning-badge" class="badge-type" style="font-size:11px">—</span>
+          </div>
+          <div id="baseline-learning-message" style="font-size:13px;color:var(--muted);margin-bottom:12px">Loading learning status…</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--muted)">
+            <span>Overall: <strong id="baseline-learning-overall" style="color:var(--text)">—</strong></span>
+            <span>Started: <strong id="baseline-learning-started" style="color:var(--text)">—</strong></span>
+            <span>Elapsed: <strong id="baseline-learning-elapsed" style="color:var(--text)">—</strong></span>
+            <span>Attacks: <strong id="baseline-learning-attacks" style="color:var(--text)">blocked</strong></span>
+          </div>
+          <div id="baseline-learning-devices" style="display:grid;gap:8px"></div>
+        </div>
+        <div class="card mb-16" id="network-load-card">
+          <div class="card-title">Network Load (Docker lab windows)</div>
+          <div style="font-size:12px;color:var(--muted);margin:-6px 0 10px">Measured from firewall detection windows — not host eth0/eth1.</div>
+          <div class="chart-wrap" style="height:180px;position:relative">
+            <div id="network-load-empty" class="empty" style="display:none;padding:24px">Loading…</div>
+            <canvas id="network-load-chart"></canvas>
+          </div>
+        </div>
         <div class="search-bar">
           <input type="text" id="search-input" placeholder="Search by name or IP…" oninput="renderOverview()" style="background:var(--surface)">
           <select id="tier-filter" onchange="renderOverview()" style="background:var(--surface)">
@@ -1753,6 +1775,10 @@
       </div>
       For testing only — simulated attacks update real trust scores and may trigger iptables enforcement in the container.
     </div>
+    <div id="attack-learning-gate" class="card mb-16" style="display:none;border-color:rgba(245,158,11,.35)">
+      <div class="card-title">Attack simulation locked</div>
+      <div id="attack-learning-gate-msg" style="font-size:13px;color:var(--muted)">Baseline learning must complete (50/50 on all five lab devices) before attacks can start.</div>
+    </div>
     <div class="attack-grid" id="attack-list">
       <div style="color:var(--muted);grid-column:1/-1;padding:20px;text-align:center">Loading devices…</div>
     </div>
@@ -1835,11 +1861,11 @@
     </div>
   </div>
 
-  <!-- ─── PAGE 9: CLOUD TELEMETRY ──────────────── -->
+  <!-- ─── PAGE 9: LOCAL OPERATION (cloud telemetry removed) ──────────────── -->
   <div class="page" id="page-cloud">
     <div class="card mb-16">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div class="card-title" style="margin-bottom:0">Cloud Telemetry — 24 h Summary</div>
+        <div class="card-title" style="margin-bottom:0">Local Operation — No Cloud Telemetry</div>
         <button class="btn btn-ghost btn-sm" onclick="loadCloud()">Refresh</button>
       </div>
       <div id="cloud-summary-wrap">
@@ -1847,7 +1873,7 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-title">Recent Quarantine Alerts</div>
+      <div class="card-title">Local Quarantine / Security Events</div>
       <div id="cloud-alerts-wrap">
         <div class="empty">Loading…</div>
       </div>
@@ -2130,7 +2156,7 @@
       attack:    'Attack Simulation',
       topology:  'Network Map',
       status:    'Pipeline Status',
-      cloud:     'Cloud Telemetry',
+      cloud:     'Local Operation',
       traffic:   'Traffic Inspector',
       auditlog:  'Audit Log',
       users:     'User Management',
@@ -2144,12 +2170,14 @@
       if (btn) btn.classList.add('active');
       const titleEl = document.getElementById('topbar-title');
       if (titleEl) titleEl.textContent = PAGE_TITLES[name] || name;
+      if (name === 'overview')  { renderSummaryHero(); fetchNetworkLoad(); fetchLearningStatus(); }
       if (name === 'timeline')  rebuildTimelineChart();
       if (name === 'topology')  renderTopology();
       if (name === 'cloud')     loadCloud();
       if (name === 'traffic')   loadTraffic();
       if (name === 'auditlog')  loadAuditLog();
       if (name === 'users')     loadUsers();
+      if (name === 'attack')    { fetchLearningStatus(); renderAttackList(); }
       const url = new URL(window.location);
       url.searchParams.set('page', name);
       window.history.replaceState({}, '', url);
@@ -2167,16 +2195,48 @@
     setInterval(updateClock, 1000);
 
     // ── API HELPERS ───────────────────────────────────────────────────────────────
+    let _refreshInFlight = null;
+    const API_FETCH_TIMEOUT_MS = 25000;
+
     async function apiFetch(path, opts = {}) {
-      const headers = { ...(opts.headers || {}) };
-      if (_jwt) headers['Authorization'] = 'Bearer ' + _jwt;
-      const res = await fetch(API + path, { ...opts, headers });
-      if (res.status === 401) {
-        _clearSession();
-        _showLoginOverlay();
-        throw new Error('Unauthorized');
-      }
-      return res.json();
+      const attempt = async (allowRefresh) => {
+        const headers = { ...(opts.headers || {}) };
+        if (_jwt) headers['Authorization'] = 'Bearer ' + _jwt;
+        const ctrl = (typeof AbortController !== 'undefined' && !opts.signal)
+          ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), API_FETCH_TIMEOUT_MS) : null;
+        try {
+          const res = await fetch(API + path, {
+            ...opts,
+            headers,
+            signal: opts.signal || (ctrl ? ctrl.signal : undefined),
+          });
+          if (res.status === 401) {
+            if (allowRefresh && _jwt) {
+              const ok = await refreshSessionToken(true);
+              if (ok) return attempt(false);
+            }
+            _handleAuthFailure('Session expired');
+            const err = new Error('Unauthorized');
+            err.status = 401;
+            err.auth = true;
+            throw err;
+          }
+          let body = null;
+          try { body = await res.json(); } catch (_) { body = null; }
+          if (!res.ok || (body && body.status === 'error')) {
+            const msg = (body && body.message) || ('HTTP ' + res.status);
+            const err = new Error(msg);
+            err.status = res.status;
+            err.body = body;
+            throw err;
+          }
+          return body;
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+      };
+      return attempt(true);
     }
 
     function fmtTs(ts) {
@@ -2218,7 +2278,7 @@
       link.click();
       document.body.removeChild(link);
     }
-
+    
     function downloadAuditCSV() {
       if (!_auditData || !_auditData.length) return;
       let csv = 'timestamp,username,role,action,target,detail,ip_addr\n';
@@ -2230,7 +2290,7 @@
       });
       downloadCSV('audit_log.csv', csv);
     }
-
+    
     function downloadEventsCSV() {
       const tbody = document.getElementById('events-body');
       if (!tbody) return;
@@ -2239,7 +2299,7 @@
       let evs = _events;
       if (dev) evs = evs.filter(e => e.device === dev);
       if (layer) evs = evs.filter(e => e.layer === layer);
-
+      
       let csv = 'timestamp,device,name,score,tier,layer,rule\n';
       evs.forEach(r => {
         const d2 = devices.find(x => x.ip === r.device);
@@ -2253,22 +2313,144 @@
       downloadCSV('anomaly_events.csv', csv);
     }
 
-    // ── API STATUS ────────────────────────────────────────────────────────────────
-    async function checkApi() {
-      try {
-        const r = await apiFetch('/status');
-        const ok = r.status === 'ok';
-        document.getElementById('api-dot').style.background = ok ? 'var(--trusted)' : 'var(--quarantine)';
-        document.getElementById('api-status').textContent = ok ? 'API live' : 'API error';
-        if (ok && r.data) {
-          const q = r.data.devices_quarantine || 0;
-          if (q > 0) document.getElementById('api-status').textContent = `API live · ${q} quarantined`;
-        }
-      } catch {
-        document.getElementById('api-dot').style.background = 'var(--quarantine)';
-        document.getElementById('api-status').textContent = AUTH_REQUIRED && !API_KEY ? 'Auth required' : 'API unreachable';
-      }
+    // ── API STATUS / SESSION KEEP-ALIVE ───────────────────────────────────────────
+    // Root cause previously: heartbeat hit public GET /status (always 200 even with a
+    // dead JWT) while apiFetch cleared the session on the first 401. Heartbeat now
+    // probes authenticated GET /auth/session; 401 triggers single-flight refresh+retry.
+    let _apiFailStreak = 0;
+    let _apiCheckInFlight = null;
+    let _apiLastOkAt = 0;
+    let _apiLastKind = 'warn';
+    let _pollInFlight = null;
+    let _authFailureHandledAt = 0;
+    const API_FAIL_RED_AFTER = 3;
+    const API_CHECK_TIMEOUT_MS = 15000;
+    const API_GRACE_MS = 45000;
+    const API_HEARTBEAT_MS = 8000;
+    const API_TOKEN_REFRESH_MS = 5 * 60 * 1000;
+    const API_POLL_MS = 20000;
+
+    function _setApiUi(kind, text) {
+      const dot = document.getElementById('api-dot');
+      const label = document.getElementById('api-status');
+      if (!dot || !label) return;
+      const color = kind === 'ok' ? 'var(--trusted)'
+        : kind === 'warn' ? 'var(--cautious)'
+        : 'var(--quarantine)';
+      dot.style.background = color;
+      label.textContent = text;
+      _apiLastKind = kind;
     }
+
+    function _handleAuthFailure(reason) {
+      // Debounce so concurrent 401s from pollAll do not thrash the login overlay.
+      const now = Date.now();
+      if (now - _authFailureHandledAt < 2000) return;
+      _authFailureHandledAt = now;
+      _clearSession();
+      _showLoginOverlay();
+      _setApiUi('warn', reason || 'Auth required');
+    }
+
+    async function refreshSessionToken(silent) {
+      if (!_jwt) return false;
+      if (_refreshInFlight) return _refreshInFlight;
+      _refreshInFlight = (async () => {
+        try {
+          const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          const timer = ctrl ? setTimeout(() => ctrl.abort(), 10000) : null;
+          try {
+            const res = await fetch(API + '/auth/refresh', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + _jwt, 'Content-Type': 'application/json' },
+              body: '{}',
+              signal: ctrl ? ctrl.signal : undefined,
+            });
+            if (!res.ok) return false;
+            const body = await res.json();
+            if (body && body.status === 'ok' && body.data && body.data.token) {
+              _saveSession(body.data.token, body.data.username || _uname, body.data.role || _urole);
+              return true;
+            }
+            return false;
+          } finally {
+            if (timer) clearTimeout(timer);
+          }
+        } catch (e) {
+          if (!silent) console.error('token refresh failed', e);
+          return false;
+        } finally {
+          _refreshInFlight = null;
+        }
+      })();
+      return _refreshInFlight;
+    }
+
+    async function checkApi() {
+      if (_apiCheckInFlight) return _apiCheckInFlight;
+      _apiCheckInFlight = (async () => {
+        if (!_jwt) {
+          _setApiUi('warn', 'Auth required');
+          return;
+        }
+        const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), API_CHECK_TIMEOUT_MS) : null;
+        try {
+          // Authenticated probe — unlike public /status, invalid JWTs return 401.
+          let res = await fetch(API + '/auth/session', {
+            headers: { 'Authorization': 'Bearer ' + _jwt },
+            signal: ctrl ? ctrl.signal : undefined,
+          });
+          if (res.status === 401) {
+            const refreshed = await refreshSessionToken(true);
+            if (!refreshed) {
+              _handleAuthFailure('Session expired');
+              return;
+            }
+            res = await fetch(API + '/auth/session', {
+              headers: { 'Authorization': 'Bearer ' + _jwt },
+            });
+            if (res.status === 401) {
+              _handleAuthFailure('Session expired');
+              return;
+            }
+          }
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const body = await res.json();
+          if (!(body && body.status === 'ok' && body.data && body.data.authenticated)) {
+            throw new Error('invalid session payload');
+          }
+          _apiFailStreak = 0;
+          _apiLastOkAt = Date.now();
+          _setApiUi('ok', 'API live · ' + (body.data.username || _uname || 'signed in'));
+        } catch (e) {
+          if (e && e.auth) {
+            _handleAuthFailure('Auth required');
+            return;
+          }
+          _apiFailStreak += 1;
+          const withinGrace = _apiLastOkAt && (Date.now() - _apiLastOkAt) < API_GRACE_MS;
+          if (withinGrace && _apiFailStreak < API_FAIL_RED_AFTER) {
+            _setApiUi('warn', 'API reconnecting…');
+          } else if (_apiFailStreak < API_FAIL_RED_AFTER) {
+            _setApiUi('warn', 'API reconnecting…');
+          } else {
+            _setApiUi('err', 'API unreachable');
+          }
+        } finally {
+          if (timer) clearTimeout(timer);
+          _apiCheckInFlight = null;
+        }
+      })();
+      return _apiCheckInFlight;
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && _jwt) {
+        checkApi();
+        refreshSessionToken(true);
+      }
+    });
 
     // ── DEVICE TYPES ──────────────────────────────────────────────────────────────
     async function fetchDeviceTypes() {
@@ -2541,34 +2723,93 @@
     }
 
     // ── QUARANTINE LIFT ───────────────────────────────────────────────────────────
+    let _liftInFlight = new Set();
     async function liftQuarantine(ip) {
+      if (!ip || _liftInFlight.has(ip)) return;
+      if (_urole === 'viewer') {
+        showToast('✗ Viewer role cannot lift quarantine — sign in as operator/admin', 'toast-downgrade');
+        return;
+      }
+      _liftInFlight.add(ip);
       try {
-        const r = await apiFetch(`/devices/${ip}/lift-quarantine`, { method: 'POST' });
+        const r = await apiFetch(`/devices/${ip}/lift-quarantine`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        });
         if (r.status === 'ok') {
+          const view = r.data || {};
           const dev = devices.find(d => d.ip === ip);
-          if (dev) { dev.tier = 'CAUTIOUS'; dev.trust_score = 0.55; dev.anomaly_streak = 0; }
+          if (dev) {
+            dev.tier = view.tier || 'CAUTIOUS';
+            dev.desired_tier = view.desired_tier || dev.tier;
+            dev.applied_tier = view.applied_tier || dev.tier;
+            dev.policy_tier = view.policy_tier || dev.tier;
+            dev.trust_score = (view.trust_score != null) ? view.trust_score : 0.55;
+            dev.anomaly_streak = view.anomaly_streak || 0;
+            dev.normal_streak = view.normal_streak || 0;
+          }
           renderOverview();
-          showToast(`↑ <strong>${ip}</strong> QUARANTINE → CAUTIOUS (manual lift)`, 'toast-upgrade');
+          renderDevices();
+          renderManageTable();
+          showToast(`↑ <strong>${(view.name || ip)}</strong> QUARANTINE → CAUTIOUS (manual lift)`, 'toast-upgrade');
+          // Pull authoritative state so WS/poll cannot leave a stale QUARANTINE badge.
+          fetchDevices();
+          fetchTierLog();
         } else {
-          alert(r.message || 'Lift failed.');
+          showToast('✗ Lift failed: ' + (r.message || 'unknown error'), 'toast-downgrade');
         }
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+        if (e && e.auth) return;
+        const msg = (e && e.message) ? e.message : 'API error';
+        showToast('✗ Lift failed: ' + msg, 'toast-downgrade');
+      } finally {
+        _liftInFlight.delete(ip);
+      }
     }
+    // Inline onclick handlers need an explicit window binding in some WebViews.
+    window.liftQuarantine = liftQuarantine;
 
     async function liftAllQuarantine() {
+      if (_urole === 'viewer') {
+        showToast('✗ Viewer role cannot lift quarantine — sign in as operator/admin', 'toast-downgrade');
+        return;
+      }
       try {
-        const r = await apiFetch('/devices/lift-all-quarantine', { method: 'POST' });
+        const r = await apiFetch('/devices/lift-all-quarantine', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        });
         if (r.status === 'ok') {
           const lifted = r.data || [];
           lifted.forEach(ip => {
             const dev = devices.find(d => d.ip === ip);
-            if (dev) { dev.tier = 'CAUTIOUS'; dev.trust_score = 0.55; dev.anomaly_streak = 0; }
+            if (dev) {
+              dev.tier = 'CAUTIOUS';
+              dev.trust_score = 0.55;
+              dev.anomaly_streak = 0;
+              dev.normal_streak = 0;
+            }
           });
           renderOverview();
+          renderDevices();
+          renderManageTable();
+          fetchTierLog();
+          fetchDevices();
           if (lifted.length) showToast(`↑ Lifted <strong>${lifted.length}</strong> device(s) from QUARANTINE → CAUTIOUS`, 'toast-upgrade');
+          else showToast('No quarantined devices to lift', 'toast-downgrade');
+        } else {
+          showToast('✗ Lift all failed: ' + (r.message || 'unknown error'), 'toast-downgrade');
         }
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+        if (e && e.auth) return;
+        showToast('✗ Lift all failed: ' + ((e && e.message) || 'API error'), 'toast-downgrade');
+      }
     }
+    window.liftAllQuarantine = liftAllQuarantine;
 
     // ── PAGE 2: MANAGE ────────────────────────────────────────────────────────────
     function renderManageTable() {
@@ -2680,13 +2921,25 @@
       QUARANTINE: 'rgba(239,68,68,1)',
       LEARNING: 'rgba(129,140,248,1)',
     };
+    // Stable per-device colours so five CAUTIOUS devices stay distinguishable.
+    const DEVICE_PALETTE = [
+      '#fbbf24', '#38bdf8', '#4ade80', '#f87171', '#fb923c',
+      '#a78bfa', '#2dd4bf', '#e879f9', '#94a3b8', '#f472b6',
+    ];
+    let _timelineCache = { at: 0, datasets: null };
+    const TIMELINE_CACHE_MS = 20000;
+
+    function deviceColor(ip) {
+      const idx = Math.max(0, devices.findIndex(d => d.ip === ip));
+      return DEVICE_PALETTE[idx % DEVICE_PALETTE.length];
+    }
 
     function updateTimelineCheckboxes() {
       const wrap = document.getElementById('timeline-checkboxes');
       const prev = new Set(timelineChecked);
       if (prev.size === 0) devices.forEach(d => timelineChecked.add(d.ip));
       wrap.innerHTML = devices.map(d => {
-        const col = TIER_COLORS[d.tier || 'TRUSTED'];
+        const col = deviceColor(d.ip);
         const chk = timelineChecked.has(d.ip) ? 'checked' : '';
         return `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
       <input type="checkbox" value="${d.ip}" ${chk} onchange="onTimelineCheck(this)">
@@ -2698,57 +2951,175 @@
     function onTimelineCheck(el) {
       if (el.checked) timelineChecked.add(el.value);
       else timelineChecked.delete(el.value);
+      _timelineCache.at = 0;
       rebuildTimelineChart();
     }
 
-    async function rebuildTimelineChart() {
+    function _parseTsMs(raw) {
+      if (raw == null) return null;
+      var s = String(raw).replace(' ', 'T');
+      if (!s.endsWith('Z') && s.indexOf('+') < 0) s += 'Z';
+      var d = new Date(s);
+      return isNaN(d.getTime()) ? null : d.getTime();
+    }
+
+    function _historyPoint(pt) {
+      const raw = pt.ts || pt.timestamp;
+      const trust = (pt.trust != null) ? pt.trust : pt.trust_score;
+      const x = _parseTsMs(raw);
+      if (x == null || trust == null || Number.isNaN(Number(trust))) return null;
+      return { x: x, y: Number(trust) };
+    }
+
+    async function rebuildTimelineChart(force) {
       updateTimelineCheckboxes();
       const ips = [...timelineChecked];
-      if (!ips.length) { if (timelineChart) { timelineChart.data.datasets = []; timelineChart.update(); } return; }
-
-      const histories = await Promise.all(
-        ips.map(ip => apiFetch(`/devices/${ip}/history?n=100`).then(r => ({ ip, data: r.data || [] })))
-      );
-
-      const datasets = histories.map(({ ip, data }) => {
-        const dev = devices.find(d => d.ip === ip);
-        const tier = dev ? (dev.tier || dev.policy_tier || 'TRUSTED') : 'TRUSTED';
-        return {
-          label: (dev ? dev.name : ip) || ip,
-          data: data.map(pt => ({ x: fmtTsShort(pt.ts), y: pt.trust })),
-          borderColor: TIER_COLORS[tier] || '#888',
-          backgroundColor: 'transparent',
-          tension: 0.3, pointRadius: 3, borderWidth: 2,
-        };
-      });
-
-      const allTs = histories.flatMap(h => h.data.map(p => fmtTsShort(p.ts))).sort();
-      if (allTs.length) {
-        const first = allTs[0], last = allTs[allTs.length - 1];
-        datasets.push({
-          label: 'TRUSTED threshold (0.75)', data: [{ x: first, y: 0.75 }, { x: last, y: 0.75 }],
-          borderColor: 'rgba(34,197,94,.35)', borderDash: [6, 4], borderWidth: 1, pointRadius: 0, backgroundColor: 'transparent'
-        });
-        datasets.push({
-          label: 'CAUTIOUS threshold (0.40)', data: [{ x: first, y: 0.40 }, { x: last, y: 0.40 }],
-          borderColor: 'rgba(239,68,68,.35)', borderDash: [6, 4], borderWidth: 1, pointRadius: 0, backgroundColor: 'transparent'
-        });
+      const ctx = document.getElementById('timeline-chart');
+      const wrap = ctx && ctx.parentElement;
+      if (!ips.length) {
+        if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
+        if (wrap) {
+          let empty = wrap.querySelector('.timeline-empty');
+          if (!empty) {
+            empty = document.createElement('div');
+            empty.className = 'timeline-empty empty';
+            empty.style.padding = '40px';
+            wrap.appendChild(empty);
+          }
+          empty.textContent = 'Select at least one device to view trust history.';
+          empty.style.display = 'block';
+          if (ctx) ctx.style.display = 'none';
+        }
+        return;
       }
 
-      const ctx = document.getElementById('timeline-chart');
+      // Always refetch when opening/refreshing: stale cache mixed old low-trust
+      // windows into a multi-hour X domain and crushed recent scores to a scribble.
+      const histories = await Promise.all(
+        ips.map(ip => apiFetch(`/devices/${ip}/history?n=120`)
+          .then(r => ({ ip, data: r.data || [] }))
+          .catch(() => ({ ip, data: [] })))
+      );
+
+      const nowMs = Date.now();
+      // Prefer the current learning session start when available; else last 2 hours.
+      let cutoff = nowMs - (2 * 60 * 60 * 1000);
+      devices.forEach(d => {
+        const started = _parseTsMs(d.learning_started_at);
+        if (started != null && started < cutoff) cutoff = started;
+      });
+
+      const datasets = [];
+      let pointCount = 0;
+      let xMin = Infinity, xMax = -Infinity;
+      histories.forEach(({ ip, data }) => {
+        const dev = devices.find(d => d.ip === ip);
+        let points = data.map(_historyPoint).filter(Boolean).sort((a, b) => a.x - b.x);
+        points = points.filter(p => p.x >= cutoff);
+        // Keep the chart readable: last 80 windows in-range.
+        if (points.length > 80) points = points.slice(-80);
+        // Anchor to live device trust so the latest value matches the overview cards.
+        if (dev && typeof dev.trust_score === 'number' && !dev.learning) {
+          const liveX = Math.max(nowMs, points.length ? points[points.length - 1].x + 1000 : nowMs);
+          points.push({ x: liveX, y: Number(dev.trust_score) });
+        }
+        if (!points.length) return;
+        pointCount += points.length;
+        points.forEach(p => { if (p.x < xMin) xMin = p.x; if (p.x > xMax) xMax = p.x; });
+        datasets.push({
+          label: (dev ? dev.name : ip) || ip,
+          _deviceIp: ip,
+          data: points,
+          borderColor: deviceColor(ip),
+          backgroundColor: 'transparent',
+          tension: 0.2,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          borderWidth: 2,
+          spanGaps: false,
+          showLine: true,
+        });
+      });
+
+      if (!pointCount) {
+        if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
+        if (wrap) {
+          let empty = wrap.querySelector('.timeline-empty');
+          if (!empty) {
+            empty = document.createElement('div');
+            empty.className = 'timeline-empty empty';
+            empty.style.padding = '40px';
+            wrap.appendChild(empty);
+          }
+          empty.textContent = 'No trust history yet — windows will appear after traffic or attack simulation.';
+          empty.style.display = 'block';
+          if (ctx) ctx.style.display = 'none';
+        }
+        return;
+      }
+
+      if (xMax < xMin + 60000) xMax = xMin + 60000;
+      datasets.push({
+        label: 'TRUSTED threshold (0.75)', _threshold: true,
+        data: [{ x: xMin, y: 0.75 }, { x: xMax, y: 0.75 }],
+        borderColor: 'rgba(34,197,94,.35)', borderDash: [6, 4], borderWidth: 1,
+        pointRadius: 0, backgroundColor: 'transparent',
+      });
+      datasets.push({
+        label: 'CAUTIOUS threshold (0.40)', _threshold: true,
+        data: [{ x: xMin, y: 0.40 }, { x: xMax, y: 0.40 }],
+        borderColor: 'rgba(239,68,68,.35)', borderDash: [6, 4], borderWidth: 1,
+        pointRadius: 0, backgroundColor: 'transparent',
+      });
+
+      if (wrap) {
+        const empty = wrap.querySelector('.timeline-empty');
+        if (empty) empty.style.display = 'none';
+        if (ctx) ctx.style.display = 'block';
+      }
+
       if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
       timelineChart = new Chart(ctx, {
         type: 'line',
         data: { datasets },
         options: {
           responsive: true, maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
+          parsing: false,
+          interaction: { mode: 'nearest', axis: 'x', intersect: false },
           scales: {
-            x: { type: 'category', ticks: { color: '#8892a4', maxTicksLimit: 12, maxRotation: 0 }, grid: { color: '#2a2d3a' } },
-            y: { min: 0, max: 1, ticks: { color: '#8892a4' }, grid: { color: '#2a2d3a' } },
+            x: {
+              type: 'linear',
+              min: xMin,
+              max: xMax,
+              ticks: {
+                color: '#8892a4',
+                maxTicksLimit: 8,
+                maxRotation: 0,
+                callback: function(value) {
+                  const d = new Date(value);
+                  if (isNaN(d.getTime())) return '';
+                  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                },
+              },
+              grid: { color: '#2a2d3a' },
+            },
+            y: {
+              min: 0, max: 1,
+              ticks: { color: '#8892a4' },
+              grid: { color: '#2a2d3a' },
+              title: { display: true, text: 'Trust score', color: '#8892a4' },
+            },
           },
-          plugins: { legend: { labels: { color: '#8892a4', boxWidth: 14 } } },
-        }
+          plugins: {
+            legend: {
+              labels: {
+                color: '#8892a4',
+                boxWidth: 14,
+                filter: (item) => !String(item.text || '').includes('threshold'),
+              },
+            },
+          },
+        },
       });
     }
 
@@ -2772,7 +3143,10 @@
 
     function fmtRelTime(ts) {
       if (!ts) return '';
-      const diff = Date.now() - new Date(ts).getTime();
+      var s = String(ts).replace(' ', 'T');
+      if (!s.endsWith('Z') && s.indexOf('+') < 0) s += 'Z';
+      const diff = Date.now() - new Date(s).getTime();
+      if (!Number.isFinite(diff) || diff < 0) return fmtTsShort(ts);
       if (diff < 60000) return 'just now';
       if (diff < 3600000) return Math.floor(diff/60000) + ' min ago';
       if (diff < 86400000) return Math.floor(diff/3600000) + ' hr ago';
@@ -2940,12 +3314,17 @@
 
     function renderAttackList() {
       const list = document.getElementById('attack-list');
+      const attacksReady = !(_learningStatus) || !!_learningStatus.attacks_ready;
+      if (document.getElementById('attack-learning-gate')) {
+        document.getElementById('attack-learning-gate').style.display = attacksReady ? 'none' : 'block';
+      }
       if (!devices.length) {
         list.innerHTML = '<div style="color:var(--muted);grid-column:1/-1;padding:20px;text-align:center">No devices registered.</div>';
         return;
       }
       list.innerHTML = devices.map(d => {
         const active   = d.is_attacking;
+        const locked   = !attacksReady && !active;
         const selType  = selectedAttackType[d.ip] || 'syn_flood';
         const tierKey  = _atkTierKey(d);
         const tierFull = d.learning ? 'LEARNING' : (d.tier || 'TRUSTED');
@@ -2957,10 +3336,10 @@
         const safeIp   = d.ip.replace(/\./g,'_');
 
         const chips = Object.entries(ATTACK_TYPES).map(([k, v]) =>
-          `<div class="atk-chip${k===selType?' selected':''}${active?' disabled':''}" onclick="${active?'':`atkSelType('${d.ip}','${k}')`}">${v.label}</div>`
+          `<div class="atk-chip${k===selType?' selected':''}${(active||locked)?' disabled':''}" onclick="${(active||locked)?'':`atkSelType('${d.ip}','${k}')`}">${v.label}</div>`
         ).join('');
 
-        return `<div class="attack-card${active?' is-attacking':''}" id="ac-${safeIp}">
+        return `<div class="attack-card${active?' is-attacking':''}${locked?' locked':''}" id="ac-${safeIp}" style="${locked?'opacity:.55':''}">
   <div class="ac-header">
     <div class="ac-icon" style="background:${iconBg}">${deviceIconSvg(d.type, tierFull)}</div>
     <div class="ac-info">
@@ -2972,16 +3351,16 @@
   <div class="ac-body">
     <div class="ac-body-label">Attack type</div>
     <div class="atk-chip-row">${chips}</div>
-    <div class="atk-desc" id="adesc-${safeIp}">${desc}</div>
+    <div class="atk-desc" id="adesc-${safeIp}">${locked ? 'Baseline learning must finish before attacks can start.' : desc}</div>
   </div>
   <div class="ac-footer">
     <div class="trust-track">
       <div class="trust-fill" id="atrust-${safeIp}" style="width:${trustPct}%;background:${trustCol}"></div>
     </div>
     <span class="trust-num" id="anum-${safeIp}" style="color:${trustCol}">${trust.toFixed(2)}</span>
-    <div class="atk-toggle-wrap" onclick="atkToggle('${d.ip}')">
+    <div class="atk-toggle-wrap" onclick="${locked?'':`atkToggle('${d.ip}')`}" title="${locked?'Blocked until baseline COMPLETE':''}">
       <div class="atk-toggle-track${active?' on':''}" id="atog-${safeIp}"><div class="atk-toggle-thumb"></div></div>
-      <span class="atk-toggle-label${active?' on':''}" id="atoglbl-${safeIp}">${active?'Attack ON':'Off'}</span>
+      <span class="atk-toggle-label${active?' on':''}" id="atoglbl-${safeIp}">${active?'Attack ON':(locked?'Locked':'Off')}</span>
     </div>
   </div>
 </div>`;
@@ -3028,27 +3407,54 @@
     }
 
     async function startAttack(ip) {
+      if (_learningStatus && !_learningStatus.attacks_ready) {
+        const msg = _learningStatus.message || 'Baseline learning must complete before attacks can start.';
+        _atkAddLog(ip, 'error', msg);
+        if (typeof showToast === 'function') showToast(msg, 'toast-downgrade');
+        return;
+      }
       const type = selectedAttackType[ip] || 'syn_flood';
       try {
-        await apiFetch(`/devices/${ip}/attack`, {
+        const r = await apiFetch(`/devices/${ip}/attack`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type }),
         });
-        const dev = devices.find(d => d.ip === ip);
-        if (dev) dev.is_attacking = true;
+        const updated = r && r.data;
+        const idx = devices.findIndex(d => d.ip === ip);
+        if (updated && idx >= 0) devices[idx] = { ...devices[idx], ...updated, is_attacking: true };
+        else if (idx >= 0) devices[idx].is_attacking = true;
         renderAttackList();
-        _atkAddLog(dev?.name || ip, 'warn', `attack started — ${ATTACK_TYPES[type]?.label || type}`);
-      } catch (e) { console.error(e); }
+        renderOverview();
+        renderDevices();
+        renderStatus();
+        _atkAddLog((updated && updated.name) || ip, 'warn', `attack started — ${ATTACK_TYPES[type]?.label || type}`);
+        if (document.getElementById('page-timeline')?.classList.contains('active')) rebuildTimelineChart();
+        fetchDevices();
+      } catch (e) {
+        console.error(e);
+        _atkAddLog(ip, 'error', e.message || 'failed to start attack');
+        if (typeof showToast === 'function') showToast(e.message || 'Attack start failed', 'toast-downgrade');
+      }
     }
 
     async function stopAttack(ip) {
       try {
-        await apiFetch(`/devices/${ip}/attack`, { method: 'DELETE' });
-        const dev = devices.find(d => d.ip === ip);
-        if (dev) dev.is_attacking = false;
+        const r = await apiFetch(`/devices/${ip}/attack`, { method: 'DELETE' });
+        const updated = r && r.data;
+        const idx = devices.findIndex(d => d.ip === ip);
+        if (updated && idx >= 0) devices[idx] = { ...devices[idx], ...updated, is_attacking: false };
+        else if (idx >= 0) devices[idx].is_attacking = false;
         renderAttackList();
-        _atkAddLog(dev?.name || ip, 'info', 'attack stopped — recovery mode active');
-      } catch (e) { console.error(e); }
+        renderOverview();
+        renderDevices();
+        renderStatus();
+        _atkAddLog((updated && updated.name) || ip, 'info', 'attack stopped — recovery mode active');
+        fetchDevices();
+      } catch (e) {
+        console.error(e);
+        _atkAddLog(ip, 'error', e.message || 'failed to stop attack');
+        if (typeof showToast === 'function') showToast(e.message || 'Attack stop failed', 'toast-downgrade');
+      }
     }
 
     // ── PAGE 9: CLOUD TELEMETRY ───────────────────────────────────────────────────
@@ -3064,10 +3470,13 @@
           apiFetch('/cloud/alerts?n=30'),
         ]);
 
-        // ── Summary table ──
-        const rows = sumRes?.data || [];
+        // ── Summary: cloud telemetry is intentionally disabled (local-only Phase A) ──
+        const payload = sumRes?.data;
+        const rows = Array.isArray(payload) ? payload : [];
         if (!rows.length) {
-          summaryWrap.innerHTML = '<div class="empty">No cloud data yet — telemetry pushes every window.</div>';
+          const msg = (payload && payload.message) ||
+            'Cloud telemetry is disabled. TrustEdge runs entirely on this Pi — no phone-home uploads.';
+          summaryWrap.innerHTML = `<div class="empty">${msg}</div>`;
         } else {
           summaryWrap.innerHTML = `
             <div class="table-wrap">
@@ -3570,17 +3979,72 @@
     let previousDeviceTiers = {};
 
     // ── SUMMARY HERO ─────────────────────────────────────────────────────────────
+    let _networkLoad = null;
+    let networkLoadChart = null;
+
+    async function fetchNetworkLoad() {
+      try {
+        const r = await apiFetch('/network-load?n=80');
+        if (r.status === 'ok') {
+          _networkLoad = r.data;
+          renderSummaryHero();
+          renderNetworkLoadChart();
+        }
+      } catch (e) { console.error('fetchNetworkLoad', e); }
+    }
+
+    function renderNetworkLoadChart() {
+      const canvas = document.getElementById('network-load-chart');
+      if (!canvas || !_networkLoad) return;
+      const series = _networkLoad.series || [];
+      const empty = document.getElementById('network-load-empty');
+      if (!series.length) {
+        if (networkLoadChart) { networkLoadChart.destroy(); networkLoadChart = null; }
+        if (empty) { empty.style.display = 'block'; empty.textContent = 'No lab window telemetry yet.'; }
+        canvas.style.display = 'none';
+        return;
+      }
+      if (empty) empty.style.display = 'none';
+      canvas.style.display = 'block';
+      const labels = series.map(p => fmtTsShort(p.ts || p.timestamp));
+      const pps = series.map(p => p.pps || 0);
+      const bps = series.map(p => (p.bps || 0) / 1000);
+      if (networkLoadChart) { networkLoadChart.destroy(); networkLoadChart = null; }
+      networkLoadChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'packets/s (lab windows)', data: pps, borderColor: '#4ade80', tension: 0.25, pointRadius: 0, borderWidth: 2 },
+            { label: 'kbps (lab windows)', data: bps, borderColor: '#818cf8', tension: 0.25, pointRadius: 0, borderWidth: 2 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#8892a4', maxTicksLimit: 8 }, grid: { color: '#2a2d3a' } },
+            y: { ticks: { color: '#8892a4' }, grid: { color: '#2a2d3a' }, beginAtZero: true },
+          },
+          plugins: { legend: { labels: { color: '#8892a4', boxWidth: 12 } } },
+        },
+      });
+    }
+
     function renderSummaryHero() {
       const hero = document.getElementById('summary-hero');
       if (!hero) return;
       const total = devices.length;
-      const trusted = devices.filter(d => !d.learning && d.tier === 'TRUSTED').length;
       const learning = devices.filter(d => d.learning).length;
       const quarant = devices.filter(d => !d.learning && d.tier === 'QUARANTINE').length;
-
       const protectedAssets = total - learning - quarant;
       const threatsContained = quarant;
-      const totalLoad = Object.values(devices).reduce((sum, d) => sum + (d.current_packets || 0), 0);
+      const windowPackets = devices.reduce((sum, d) => sum + (d.current_packets || 0), 0);
+      const loadPackets = (_networkLoad && _networkLoad.total_packets != null)
+        ? _networkLoad.total_packets : windowPackets;
+      const loadBytes = _networkLoad && _networkLoad.total_bytes != null ? _networkLoad.total_bytes : null;
+      const loadSub = loadBytes != null
+        ? (fmtBytes(loadBytes) + ' · docker lab windows')
+        : 'pkts in latest windows · lab';
 
       hero.innerHTML = `
         <div class="hero-stat">
@@ -3595,8 +4059,8 @@
         </div>
         <div class="hero-stat">
           <div class="hero-label">NETWORK LOAD</div>
-          <div class="hero-value">${totalLoad}</div>
-          <div class="hero-sub">p/w total throughput</div>
+          <div class="hero-value">${loadPackets}</div>
+          <div class="hero-sub">${loadSub}</div>
         </div>
       `;
     }
@@ -3843,16 +4307,112 @@
     }
 
     // ── POLL LOOP ─────────────────────────────────────────────────────────────────
-    async function pollAll() {
-      await Promise.all([checkApi(), fetchDevices(), fetchTierLog(), fetchAnomalyEvents()]);
+    let _learningStatus = null;
+
+    function fmtElapsed(sec) {
+      if (sec == null || sec < 0) return '—';
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+      if (h) return h + 'h ' + m + 'm';
+      if (m) return m + 'm ' + s + 's';
+      return s + 's';
     }
 
-    function connectWS() {
+    function renderLearningStatus(data) {
+      _learningStatus = data || null;
+      const badge = document.getElementById('baseline-learning-badge');
+      const msg = document.getElementById('baseline-learning-message');
+      const overall = document.getElementById('baseline-learning-overall');
+      const started = document.getElementById('baseline-learning-started');
+      const elapsed = document.getElementById('baseline-learning-elapsed');
+      const attacks = document.getElementById('baseline-learning-attacks');
+      const list = document.getElementById('baseline-learning-devices');
+      const gate = document.getElementById('attack-learning-gate');
+      const gateMsg = document.getElementById('attack-learning-gate-msg');
+      if (!data) return;
+      if (badge) {
+        badge.textContent = data.status || '—';
+        badge.style.background = data.attacks_ready ? 'rgba(34,197,94,.15)' :
+          (data.status === 'IN_PROGRESS' ? 'rgba(245,158,11,.15)' : 'rgba(136,146,164,.15)');
+        badge.style.color = data.attacks_ready ? '#4ade80' :
+          (data.status === 'IN_PROGRESS' ? '#fbbf24' : 'var(--muted)');
+      }
+      if (msg) msg.textContent = data.message || '';
+      if (overall) overall.textContent = (data.lab_devices_complete || 0) + '/' +
+        (data.lab_devices_expected || 5) + ' lab devices · ' +
+        (data.devices_complete || 0) + '/' + (data.devices_total || 0) + ' enrolled complete';
+      if (started) started.textContent = data.learning_started_at ? fmtTs(data.learning_started_at) : 'not started';
+      if (elapsed) elapsed.textContent = fmtElapsed(data.elapsed_seconds);
+      if (attacks) {
+        attacks.textContent = data.attacks_ready ? 'ready' : 'blocked until COMPLETE';
+        attacks.style.color = data.attacks_ready ? '#4ade80' : '#fbbf24';
+      }
+      if (list) {
+        const rows = data.devices || [];
+        if (!rows.length) {
+          list.innerHTML = '<div class="empty" style="padding:8px">No devices enrolled yet.</div>';
+        } else {
+          list.innerHTML = rows.map(r => {
+            const pct = Math.round(100 * (r.baseline_windows || 0) / (r.baseline_required || 50));
+            const col = r.complete ? '#4ade80' : '#818cf8';
+            return '<div style="display:grid;grid-template-columns:minmax(120px,1.2fr) 90px 1fr 70px;gap:10px;align-items:center;font-size:12px">' +
+              '<div><strong style="color:var(--text)">' + (r.name || r.ip) + '</strong><br><code style="color:var(--muted);font-size:10px">' + r.ip + '</code></div>' +
+              '<div style="font-family:monospace">' + (r.baseline_windows || 0) + '/' + (r.baseline_required || 50) + '</div>' +
+              '<div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + col + '"></div></div>' +
+              '<div style="color:' + col + ';font-weight:600">' + (r.complete ? 'DONE' : (r.baseline_remaining + ' left')) + '</div></div>';
+          }).join('');
+        }
+      }
+      if (gate) {
+        gate.style.display = data.attacks_ready ? 'none' : 'block';
+        if (gateMsg) gateMsg.textContent = data.message || gateMsg.textContent;
+      }
+    }
+
+    async function fetchLearningStatus() {
+      try {
+        const r = await apiFetch('/learning-status');
+        if (r.status === 'ok') renderLearningStatus(r.data);
+      } catch (e) { console.error('fetchLearningStatus', e); }
+    }
+
+    async function pollAll() {
+      // Skip overlapping polls so a slow Tailscale round-trip cannot stack requests.
+      if (_pollInFlight) return _pollInFlight;
       if (!_jwt) return;
+      _pollInFlight = (async () => {
+        try {
+          await Promise.all([
+            fetchDevices(),
+            fetchTierLog(),
+            fetchAnomalyEvents(),
+            fetchNetworkLoad(),
+            fetchLearningStatus(),
+          ]);
+          if (document.getElementById('page-timeline')?.classList.contains('active')) {
+            await rebuildTimelineChart();
+          }
+          if (document.getElementById('page-traffic')?.classList.contains('active')) loadTraffic();
+          if (document.getElementById('page-auditlog')?.classList.contains('active')) loadAuditLog();
+          if (document.getElementById('page-attack')?.classList.contains('active')) renderAttackList();
+        } catch (e) {
+          if (!(e && e.auth)) console.error('pollAll', e);
+        } finally {
+          _pollInFlight = null;
+        }
+      })();
+      return _pollInFlight;
+    }
+
+    let _ws = null;
+    let _wsReconnectTimer = null;
+    function connectWS() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      if (!_jwt) return;
+      if (_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) return;
       // Browsers cannot set Authorization on WebSocket; pass JWT as a query token.
       const wsUrl = `${protocol}//${window.location.host}${API}/ws?token=${encodeURIComponent(_jwt)}`;
       const ws = new WebSocket(wsUrl);
+      _ws = ws;
       ws.onmessage = function(e) {
         try {
           const msg = JSON.parse(e.data);
@@ -3867,16 +4427,23 @@
             updateEventDeviceFilter();
             fetchAnomalyEvents();
             fetchTierLog();
-            if (document.getElementById('page-topology').classList.contains('active')) {
+            if (document.getElementById('page-topology')?.classList.contains('active')) {
               renderTopology();
             }
-            if (document.getElementById('page-timeline').classList.contains('active')) {
+            if (document.getElementById('page-timeline')?.classList.contains('active')) {
               rebuildTimelineChart();
             }
           }
         } catch (err) { console.error("WS parse error", err); }
       };
-      ws.onclose = () => setTimeout(connectWS, 2000);
+      ws.onclose = () => {
+        if (_ws === ws) _ws = null;
+        if (_wsReconnectTimer) clearTimeout(_wsReconnectTimer);
+        _wsReconnectTimer = setTimeout(async () => {
+          if (_jwt) await refreshSessionToken(true);
+          connectWS();
+        }, 3000);
+      };
     }
 
     // ── TRAFFIC INSPECTOR ─────────────────────────────────────────────────────────
@@ -3889,10 +4456,11 @@
         if (protoVal === 'TCP') url += '&proto=6';
         else if (protoVal === 'UDP') url += '&proto=17';
         else if (protoVal === 'ICMP') url += '&proto=1';
-
+        
         const r = await apiFetch(url);
         if (r.status === 'ok') {
-          _trafficData = (r.data || []).reverse();
+          // API returns newest-first; keep that order for the live inspector.
+          _trafficData = r.data || [];
           const sel = document.getElementById('traffic-device-filter');
           if (sel) {
             const known = [...new Set(_trafficData.map(x => x.device).filter(Boolean))];
@@ -3919,19 +4487,24 @@
       tbody.innerHTML = rows.slice(0, 300).map(r => {
         const tier = r.tier || 'TRUSTED';
         const dev2 = devices.find(d => d.ip === r.device);
-        let protoStr = String(r.proto);
-        if (r.proto === 6) protoStr = 'TCP';
-        else if (r.proto === 17) protoStr = 'UDP';
-        else if (r.proto === 1) protoStr = 'ICMP';
-
+        const rawProto = r.proto;
+        let protoStr = '–';
+        if (rawProto === 6 || rawProto === '6' || String(rawProto).toLowerCase() === 'tcp') protoStr = 'TCP';
+        else if (rawProto === 17 || rawProto === '17' || String(rawProto).toLowerCase() === 'udp') protoStr = 'UDP';
+        else if (rawProto === 1 || rawProto === '1' || String(rawProto).toLowerCase() === 'icmp') protoStr = 'ICMP';
+        else if (rawProto != null && rawProto !== '') protoStr = String(rawProto).toUpperCase();
+        const sport = (protoStr === 'ICMP' || r.sport == null || r.sport === '') ? '–' : r.sport;
+        const dport = (protoStr === 'ICMP' || r.dport == null || r.dport === '') ? '–' : r.dport;
+        const ts = r.ts || r.timestamp;
+        const size = (r.size != null) ? r.size : r.bytes;
         return '<tr>' +
-          '<td style="font-family:monospace;font-size:11px;color:var(--muted)">' + fmtTs(r.ts) + '</td>' +
+          '<td style="font-family:monospace;font-size:11px;color:var(--muted)">' + fmtTs(ts) + '</td>' +
           '<td>' + (dev2?dev2.name:(r.device||'\u2013')) + '<br><code style="font-size:10px;color:var(--muted)">' + (r.device||'') + '</code></td>' +
           '<td style="font-family:monospace;font-size:11px">' + (r.src||'\u2013') + '</td>' +
           '<td style="font-family:monospace;font-size:11px">' + (r.dst||'\u2013') + '</td>' +
           '<td style="font-family:monospace;font-size:11px">' + protoStr + '</td>' +
-          '<td style="font-family:monospace;font-size:11px">' + (r.sport||'*') + ' &rarr; ' + (r.dport||'*') + '</td>' +
-          '<td style="text-align:right">' + fmtBytes(r.size) + '</td>' +
+          '<td style="font-family:monospace;font-size:11px">' + sport + ' &rarr; ' + dport + '</td>' +
+          '<td style="text-align:right">' + fmtBytes(size) + '</td>' +
           '<td style="font-family:monospace;font-size:11px">' + (r.flags||'\u2013') + '</td>' +
           '<td><span class="badge badge-' + tier + '" style="font-size:10px">' + tier + '</span></td>' +
           '</tr>';
@@ -3943,7 +4516,8 @@
     async function loadAuditLog() {
       try {
         const r = await apiFetch('/audit-log?n=200');
-        if (r.status === 'ok') { _auditData = (r.data || []).reverse(); renderAuditLog(); }
+        // API returns newest-first; keep chronological newest at top.
+        if (r.status === 'ok') { _auditData = r.data || []; renderAuditLog(); }
       } catch(e) { console.error('loadAuditLog', e); }
     }
     function renderAuditLog() {
@@ -4054,13 +4628,16 @@
     })();
     fetchDeviceTypes();
     pollAll().then(() => connectWS());
-    setInterval(checkApi, 10000);
-    setInterval(pollAll, 15000);
+    setInterval(checkApi, API_HEARTBEAT_MS);
+    setInterval(pollAll, API_POLL_MS);
+    setInterval(() => { if (_jwt) refreshSessionToken(true); }, API_TOKEN_REFRESH_MS);
+    checkApi();
     // JWT gate: show login overlay if no token stored
     if (!_jwt) {
       _showLoginOverlay();
     } else {
       _applyRoleVisibility();
+      refreshSessionToken(true);
     }
   </script>
 

@@ -1,0 +1,32 @@
+# Pi-only build overlay: use host networking during image builds.
+# Required when host TrustEdge nftables forward policy drops Docker bridge
+# egress (DNS/pip/apt). Does NOT modify host nftables, eth0, or eth1.
+# Runtime containers still use the lab bridge networks from docker-compose.yml.
+services:
+  firewall:
+    build:
+      network: host
+  laptop:
+    build:
+      network: host
+  iot-camera:
+    build:
+      network: host
+  iot-thermostat:
+    build:
+      network: host
+  phone:
+    build:
+      network: host
+  printer:
+    build:
+      network: host
+  webserver:
+    build:
+      network: host
+  wan-sink:
+    build:
+      network: host
+  dns:
+    build:
+      network: host

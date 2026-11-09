@@ -8,7 +8,7 @@ class PolicyError(RuntimeError):
 
 class SimulationPolicy:
     def apply(self, devices):
-        return None
+        return {'table': 'simulation', 'device_count': len(devices), 'verified': True}
 
 class NftPolicy:
     def __init__(self, lan, subnet, dns, runner=subprocess.run, wan=None, api_port=8080):
@@ -77,10 +77,28 @@ class NftPolicy:
         return '\n'.join(lines) + '\n'
 
     def apply(self, devices):
+        rendered = self.render(devices)
         try:
-            result = self.runner(['nft', '-f', '-'], input=self.render(devices), text=True,
+            result = self.runner(['nft', '-f', '-'], input=rendered, text=True,
                                  capture_output=True, timeout=10, check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise PolicyError(str(exc)) from exc
         if result.returncode != 0:
             raise PolicyError(result.stderr.strip() or 'nftables transaction failed')
+        # Read-back confirms the owned table exists after the atomic replace.
+        # Fail closed so applied_tier is not advanced on a silent no-op apply.
+        try:
+            check = self.runner(
+                ['nft', '-j', 'list', 'table', 'inet', 'trustedge'],
+                capture_output=True, text=True, timeout=5, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise PolicyError(f'nftables verify failed: {exc}') from exc
+        if check.returncode != 0:
+            raise PolicyError(
+                check.stderr.strip() or 'nftables verify failed: inet trustedge missing')
+        return {
+            'table': 'inet trustedge',
+            'device_count': len(devices),
+            'rule_lines': rendered.count('\n'),
+            'verified': True,
+        }

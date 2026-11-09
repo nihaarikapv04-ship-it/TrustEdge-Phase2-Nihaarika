@@ -240,16 +240,75 @@ class ModelLifecycleTests(unittest.TestCase):
             import_device(self.store, IP, self.temp.name)
         self.assertEqual(before, self.store.model(IP))
 
-    def test_rolling_autoencoder_and_refit_keep_original_calibration_anchors(self):
+    def test_baseline_if_frozen_across_100_200_300_windows(self):
+        """Baseline IF+scaler+calibration must not change after AE fits or many windows."""
+        import pickle
         self.train()
         d = self.store.devices()[IP]
-        anchors = self.g.detector.load(d)['calibration'].copy()
-        for _ in range(100):
+        self.assertEqual(len(d['baseline']), 50)
+        self.assertFalse(d['learning'])
+        # Reach first AE fit (needs 15 rolling normals) without touching IF.
+        for _ in range(20):
             self.g.window(IP, fixture(IP), 60)
         d = self.store.devices()[IP]
         bundle = self.g.detector.load(d)
-        self.assertEqual(d['detection_windows'], 100)
-        self.assertEqual(len(d['rolling']), 50)
         self.assertIn('ae_model', bundle)
-        for key in ('baseline_mean','baseline_min'):
-            self.assertEqual(bundle['calibration'][key], anchors[key])
+        self.assertGreaterEqual(d['detection_windows'], 15)
+        if_fp = (
+            pickle.dumps(bundle['model'], protocol=5),
+            pickle.dumps(bundle['scaler'], protocol=5),
+            bundle['calibration']['baseline_mean'],
+            bundle['calibration']['baseline_min'],
+            bundle['calibration']['baseline_std'],
+            bundle['identity'],
+        )
+        baseline_rows = list(d['baseline'])
+        baseline_scores = [detection.isolation_score(bundle, row) for row in baseline_rows]
+        # Original baseline must not look widely anomalous under its own model.
+        self.assertLess(sum(1 for s in baseline_scores if s >= detection.NOISE_FLOOR) / len(baseline_scores), .25)
+
+        for target in (100, 200, 300):
+            while self.store.devices()[IP]['detection_windows'] < target:
+                self.g.window(IP, fixture(IP), 60)
+            d = self.store.devices()[IP]
+            bundle = self.g.detector.load(d)
+            self.assertEqual(d['detection_windows'], target)
+            self.assertEqual(len(d['rolling']), 50)
+            self.assertIn('ae_model', bundle)
+            self.assertEqual(
+                (
+                    pickle.dumps(bundle['model'], protocol=5),
+                    pickle.dumps(bundle['scaler'], protocol=5),
+                    bundle['calibration']['baseline_mean'],
+                    bundle['calibration']['baseline_min'],
+                    bundle['calibration']['baseline_std'],
+                    bundle['identity'],
+                ),
+                if_fp,
+            )
+            self.assertEqual(bundle['identity'], (d['epoch'], d['generation']))
+            self.assertEqual(
+                [detection.isolation_score(bundle, row) for row in baseline_rows],
+                baseline_scores,
+            )
+
+    def test_each_device_keeps_own_baseline_model_identity(self):
+        other = '192.168.50.3'
+        self.g.register(other, 'laptop', device_type='laptop')
+        self.train()
+        for _ in range(50):
+            self.g.window(other, fixture(other), 60)
+        a = self.g.detector.load(self.store.devices()[IP])
+        b = self.g.detector.load(self.store.devices()[other])
+        self.assertNotEqual(a['identity'], b['identity'])
+        self.assertEqual(a['identity'][1], self.store.devices()[IP]['generation'])
+        self.assertEqual(b['identity'][1], self.store.devices()[other]['generation'])
+        self.assertNotEqual(self.store.model(IP), self.store.model(other))
+        # Advance past former refit boundaries; identities stay device-local.
+        for _ in range(100):
+            self.g.window(IP, fixture(IP), 60)
+            self.g.window(other, fixture(other), 60)
+        a2 = self.g.detector.load(self.store.devices()[IP])
+        b2 = self.g.detector.load(self.store.devices()[other])
+        self.assertEqual(a2['identity'], a['identity'])
+        self.assertEqual(b2['identity'], b['identity'])

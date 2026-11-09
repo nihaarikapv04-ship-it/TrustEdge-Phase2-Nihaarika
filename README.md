@@ -72,7 +72,7 @@ For Phase 1-style multi-container evaluation on this machine, see [`lab/README.m
 
 ## Raspberry Pi deployment
 
-Deployment is prepared for a Pi 4 with built-in Ethernet WAN and a USB Ethernet LAN. It uses native Python/systemd, local dnsmasq and nftables, with no Docker or cloud services. See [the deployment guide](docs/PI_DEPLOYMENT.md) for wiring, configuration, artifact installation and hardware acceptance tests.
+Deployment is prepared for a Pi 4/5 with built-in Ethernet WAN and a USB Ethernet LAN. Phase A software runs local-first on the Pi (SQLite + nftables + Phase 1 dashboard) with **no TrustEdge cloud telemetry**. See [Phase A software release](docs/PHASE_A_SOFTWARE_RELEASE.md) for architecture, telemetry removal, schema, backup/restore, and what remains for physical IoT commissioning. See also [the deployment guide](docs/PI_DEPLOYMENT.md).
 
 Generate deployment files without changing your host network:
 
